@@ -13,6 +13,7 @@ class PlaybackEngine(QObject):
         super().__init__()
         self.player = QMediaPlayer()
         self.audio = QAudioOutput()
+        self.audio.setVolume(0.7)
         self.player.setAudioOutput(self.audio)
 
         self._current_track: Optional[str] = None
@@ -22,6 +23,10 @@ class PlaybackEngine(QObject):
         self.player.positionChanged.connect(self._on_position_changed)
         self.player.durationChanged.connect(self._on_duration_changed)
         self.player.playbackStateChanged.connect(self._on_state_changed)
+        self.player.errorOccurred.connect(self._on_error)
+
+    def _on_error(self, error, error_string):
+        print(f"[Playback Error] {error}: {error_string}")
 
     def load_track(self, file_path: str):
         self._current_track = file_path

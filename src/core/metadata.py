@@ -3,10 +3,9 @@ from typing import Optional
 import mutagen
 from mutagen.mp3 import MP3
 from mutagen.flac import FLAC
-from mutagen.wave import WAVE
 
 
-SUPPORTED_EXTENSIONS = {".mp3", ".flac", ".wav"}
+SUPPORTED_EXTENSIONS = {".mp3", ".flac"}
 
 
 def is_supported(path: str) -> bool:
@@ -87,16 +86,31 @@ def read_comment(file_path: str) -> list[str]:
 
     try:
         audio = mutagen.File(file_path)
-        if audio is None or not hasattr(audio, "tags") or audio.tags is None:
+        if audio is None:
             return []
 
-        comment = audio.tags.get("COMMENT")
-        if comment:
-            return comment[0].split() if comment[0] else []
+        if not hasattr(audio, "tags") or audio.tags is None:
+            return []
 
-        comment = audio.tags.get("COMM")
-        if comment:
-            return comment[0].text.split() if comment[0].text else []
+        if isinstance(audio, MP3):
+            if hasattr(audio.tags, "getall"):
+                comm_all = list(audio.tags.getall("COMM"))
+                if comm_all:
+                    text = comm_all[0].text
+                    if isinstance(text, list) and text:
+                        text = text[0]
+                    if text:
+                        return text.split()
+                    return []
+        else:
+            comment = audio.tags.get("COMMENT")
+            if comment:
+                text = comment[0] if isinstance(comment, list) else comment
+                if isinstance(text, list) and text:
+                    text = text[0]
+                if text:
+                    return text.split()
+                return []
 
         return []
     except Exception:
@@ -116,15 +130,20 @@ def write_comment(file_path: str, categories: list[str]) -> bool:
         comment_text = " ".join(categories)
 
         if isinstance(audio, MP3):
-            audio.tags["COMM"] = mutagen.id3.COMM(
-                encoding=3,
-                lang="eng",
-                text=comment_text,
+            if audio.tags is None:
+                audio.add_tags()
+            audio.tags.setall(
+                "COMM",
+                [
+                    mutagen.id3.COMM(
+                        encoding=3,
+                        lang="eng",
+                        text=comment_text,
+                    )
+                ],
             )
         elif isinstance(audio, FLAC):
             audio.tags["COMMENT"] = [comment_text]
-        elif isinstance(audio, WAVE):
-            audio.tags["COMM"] = [comment_text]
 
         audio.save()
         return True

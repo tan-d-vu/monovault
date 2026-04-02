@@ -115,9 +115,9 @@
 #### 3.1.1 Library Management
 - **Add Folders**: File > Add Folder (multi-select dialog)
 - **Remove Folders**: Right-click folder > Remove
-- **Scan Folders**: Recursive scan for MP3, FLAC, WAV files
-- **Metadata Reading**: Extract ID3 (MP3), Vorbis (FLAC), RIFF (WAV) tags
-- **Album Art**: FLAC uses `audio.pictures`, MP3 uses APIC frame, WAV uses covr (all formats working)
+- **Scan Folders**: Recursive scan for MP3, FLAC files
+- **Metadata Reading**: Extract ID3 (MP3), Vorbis (FLAC) tags
+- **Album Art**: FLAC uses `audio.pictures`, MP3 uses APIC frame (all formats working)
 - **Storage**: In-memory for performance (files remain source of truth)
 - **Refresh**: Menu option to rescan all folders
 
@@ -134,7 +134,7 @@
 - **View Categories**: Displayed in Track List column and Details panel
 - **Add Category**: Type in input field, press Enter or click Add
 - **Remove Category**: Click X on category pill
-- **Category Storage**: Write to COMMENT metadata tag
+- **Category Storage**: Write to COMMENT/COMM metadata tag
 - **Format**: Each category = one word, space-separated for multiple
 
 #### 3.1.4 Category Suggestions
@@ -241,7 +241,7 @@
 
 1. **Library Scanning**
    - [ ] Can add multiple folders
-   - [ ] Scans recursively for MP3, FLAC, WAV
+   - [ ] Scans recursively for MP3, FLAC
    - [ ] Displays all tracks in list
    - [ ] Shows progress for large scans
 

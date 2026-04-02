@@ -48,6 +48,7 @@ class MainWindow(QMainWindow):
         self.search_timer = QTimer()
         self.search_timer.setSingleShot(True)
         self.search_timer.timeout.connect(self._do_search)
+        self._is_seeking = False
 
         self._setup_ui()
         self._load_library()
@@ -247,7 +248,9 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.next_btn)
 
         self.position_slider = QSlider(Qt.Orientation.Horizontal)
-        self.position_slider.setRange(0, 100)
+        self.position_slider.setRange(0, 1000)
+        self.position_slider.setValue(0)
+        self.position_slider.setTracking(True)
         self.position_slider.sliderMoved.connect(self._on_seek)
         layout.addWidget(self.position_slider)
 
@@ -398,27 +401,40 @@ class MainWindow(QMainWindow):
             pass
 
     def _on_seek(self, position):
-        duration = self.playback.get_duration()
-        if duration > 0:
-            self.playback.seek(int(position / 100 * duration))
+        if self._is_seeking:
+            return
+        self._is_seeking = True
+        try:
+            duration = self.playback.get_duration()
+            if duration > 0:
+                seek_pos = int(position / 1000 * duration)
+                self.playback.seek(seek_pos)
+        finally:
+            self._is_seeking = False
 
     def _on_volume_changed(self, value):
         self.playback.set_volume(value)
 
     def _on_position_changed(self, position):
-        duration = self.playback.get_duration()
-        if duration > 0:
-            self.position_slider.setValue(int(position / duration * 100))
+        if self._is_seeking:
+            return
+        self._is_seeking = True
+        try:
+            duration = self.playback.get_duration()
+            if duration > 0:
+                self.position_slider.setValue(int(position / duration * 1000))
 
-        current_secs = position // 1000
-        mins, secs = divmod(current_secs, 60)
-        current_time = f"{mins:02d}:{secs:02d}"
+            current_secs = position // 1000
+            mins, secs = divmod(current_secs, 60)
+            current_time = f"{mins:02d}:{secs:02d}"
 
-        total_secs = duration // 1000
-        mins, secs = divmod(total_secs, 60)
-        total_time = f"{mins:02d}:{secs:02d}"
+            total_secs = duration // 1000
+            mins, secs = divmod(total_secs, 60)
+            total_time = f"{mins:02d}:{secs:02d}"
 
-        self.time_label.setText(f"{current_time} / {total_time}")
+            self.time_label.setText(f"{current_time} / {total_time}")
+        finally:
+            self._is_seeking = False
 
     def _on_duration_changed(self, duration):
         self.position_slider.setValue(0)

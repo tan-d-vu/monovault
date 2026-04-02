@@ -73,7 +73,7 @@ pyinstaller --onefile --windowed src/ui/main_window.py
 - **Alternative considered**: CustomTkinter (simpler but less flexible)
 
 ### 2. mutagen for metadata
-- **Reason**: Mature library supporting MP3 (ID3), FLAC (Vorbis), WAV (RIFF)
+- **Reason**: Mature library supporting MP3 (ID3), FLAC (Vorbis)
 - **Alternative**: eyeD3 (MP3 only), tinytag (read-only)
 
 ### 3. In-memory storage
@@ -81,7 +81,7 @@ pyinstaller --onefile --windowed src/ui/main_window.py
 - **Design**: All tracks kept in memory; audio files remain source of truth
 
 ### 4. COMMENT tag for categories
-- **Reason**: Universal across MP3/FLAC/WAV, user-editable in other apps
+- **Reason**: COMM for MP3, COMMENT for FLAC - user-editable in other apps
 - **Format**: Space-separated words (e.g., "rock favorite workout")
 
 ### 5. Category suggestion algorithm

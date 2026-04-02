@@ -17,7 +17,7 @@
 
 #### 1. Library Management
 - Scan 1 or more folders recursively
-- Support audio formats: MP3, FLAC, WAV
+- Support audio formats: MP3, FLAC
 - In-memory storage for performance (2000+ tracks ~700KB)
 - Album art extraction and display
 
@@ -28,8 +28,8 @@
 - Basic track info (name, artist, length)
 
 #### 3. Categorization System
-- Categories stored in COMMENT metadata tag (per file)
-- Each word in COMMENT = one category
+- Categories stored in metadata tag (COMM for MP3, COMMENT for FLAC)
+- Each word in tag = one category
 - Multiple categories per file supported
 - Case-insensitive (normalized to lowercase)
 
