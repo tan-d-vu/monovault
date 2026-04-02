@@ -1,24 +1,27 @@
 from typing import Optional
 from ..models.track import Track
+from .config import Config
 
 
 class LibraryManager:
     def __init__(self):
         self.tracks: dict[int, Track] = {}
         self.next_id: int = 1
-        self.folders: list[str] = []
+        self.config = Config()
+        self.folders: list[str] = self.config.get_folders()
 
     def add_folder(self, path: str) -> bool:
-        if path in self.folders:
-            return False
-        self.folders.append(path)
-        return True
+        if self.config.add_folder(path):
+            self.folders = self.config.get_folders()
+            return True
+        return False
 
     def remove_folder(self, path: str):
-        self.folders = [f for f in self.folders if f != path]
-        self.tracks = {
-            tid: t for tid, t in self.tracks.items() if t.folder_path != path
-        }
+        if self.config.remove_folder(path):
+            self.folders = self.config.get_folders()
+            self.tracks = {
+                tid: t for tid, t in self.tracks.items() if t.folder_path != path
+            }
 
     def get_folders(self) -> list[str]:
         return list(self.folders)

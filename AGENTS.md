@@ -80,7 +80,12 @@ pyinstaller --onefile --windowed src/ui/main_window.py
 - **Reason**: 2000+ tracks uses only ~700KB memory, simpler than SQLite
 - **Design**: All tracks kept in memory; audio files remain source of truth
 
-### 4. COMMENT tag for categories
+### 4. JSON config file for folder persistence
+- **Location**: `~/.monovault/config.json` (Linux/macOS), `%APPDATA%/monovault/config.json` (Windows)
+- **Format**: `{"folders": ["/path/to/music1", "/path/to/music2"]}`
+- **Behavior**: Created on first run; folders loaded automatically on startup
+
+### 5. COMMENT tag for categories
 - **Reason**: COMM for MP3, COMMENT for FLAC - user-editable in other apps
 - **Format**: Space-separated words (e.g., "rock favorite workout")
 
@@ -97,7 +102,9 @@ pyinstaller --onefile --windowed src/ui/main_window.py
 ## Key Modules
 
 ### library.py
-- `add_folder(path)` - Add folder to library
+- `add_folder(path)` - Add folder to library (saves to config)
+- `remove_folder(path)` - Remove folder from library (updates config)
+- `get_folders()` - Get list of configured folders
 - `add_track(track)` - Add track (handles duplicates by file_path)
 - `get_all_tracks()` - Get all tracks
 - `search(query)` - Search by title, artist, album, category
@@ -105,6 +112,12 @@ pyinstaller --onefile --windowed src/ui/main_window.py
 - `get_tracks_with_categories(categories)` - Get tracks with matching categories
 - `update_track(track)` - Update track in memory
 - `clear()` - Clear all tracks
+
+### config.py
+- JSON config file at `~/.monovault/config.json`
+- `add_folder(path)` - Add folder to config
+- `remove_folder(path)` - Remove folder from config
+- `get_folders()` - Get saved folders
 
 ### metadata.py
 - `read_metadata(path)` - Extract title, artist, album, duration, art

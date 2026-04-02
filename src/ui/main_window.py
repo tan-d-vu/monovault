@@ -22,9 +22,10 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QHeaderView,
     QAbstractItemView,
+    QMenu,
 )
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QSize
-from PyQt6.QtGui import QAction
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QSize, QPoint
+from PyQt6.QtGui import QAction, QMouseEvent
 
 from .styles import THEME, STYLESHEET
 from .widgets import CategoryPill, SuggestionButton
@@ -81,8 +82,8 @@ class MainWindow(QMainWindow):
 
         overall = QWidget()
         overall_layout = QVBoxLayout(overall)
-        overall_layout.setContentsMargins(0, 0, 0, 0)
-        overall_layout.setSpacing(0)
+        overall_layout.setContentsMargins(4, 4, 4, 4)
+        overall_layout.setSpacing(4)
         overall_layout.addWidget(splitter)
         overall_layout.addWidget(self.playback_bar)
 
@@ -122,6 +123,12 @@ class MainWindow(QMainWindow):
         self.folder_tree_widget.setHeaderHidden(True)
         self.folder_tree_widget.setAlternatingRowColors(True)
         self.folder_tree_widget.itemClicked.connect(self._on_folder_clicked)
+        self.folder_tree_widget.setContextMenuPolicy(
+            Qt.ContextMenuPolicy.CustomContextMenu
+        )
+        self.folder_tree_widget.customContextMenuRequested.connect(
+            self._on_folder_context_menu
+        )
         layout.addWidget(self.folder_tree_widget)
 
         return panel
@@ -286,6 +293,8 @@ class MainWindow(QMainWindow):
             item.setData(0, Qt.ItemDataRole.UserRole, folder)
             self.folder_tree_widget.addTopLevelItem(item)
 
+        for folder in folders:
+            self._scan_folder(folder)
         self._load_tracks()
 
     def _load_tracks(self):
@@ -331,6 +340,32 @@ class MainWindow(QMainWindow):
 
     def _on_folder_clicked(self, item, column):
         pass
+
+    def _on_folder_context_menu(self, pos):
+        item = self.folder_tree_widget.itemAt(pos)
+        if not item:
+            return
+        folder = item.data(0, Qt.ItemDataRole.UserRole)
+        if not folder:
+            return
+
+        menu = QMenu(self)
+        remove_action = menu.addAction("Remove Folder")
+        action = menu.exec(self.folder_tree_widget.mapToGlobal(pos))
+        if action == remove_action:
+            self._remove_folder(folder)
+
+    def _remove_folder(self, folder: str):
+        reply = QMessageBox.question(
+            self,
+            "Remove Folder",
+            f"Remove '{folder}' from library?\nThis will remove all tracks from this folder.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            self.library.remove_folder(folder)
+            self._load_library()
+            self._load_tracks()
 
     def _on_search_changed(self, text):
         self.search_timer.start(1500)

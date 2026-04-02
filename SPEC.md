@@ -43,15 +43,13 @@
 ### 2.2 Visual Design
 
 **Color Palette**:
-- Primary Background: `#1E1E2E` (dark charcoal)
-- Secondary Background: `#2A2A3C` (lighter charcoal)
-- Accent Color: `#7C3AED` (purple)
-- Accent Hover: `#8B5CF6` (lighter purple)
-- Text Primary: `#E4E4E7` (off-white)
-- Text Secondary: `#A1A1AA` (gray)
-- Border Color: `#3F3F50` (muted gray)
-- Success: `#22C55E` (green)
-- Warning: `#F59E0B` (amber)
+- Primary Background: `#0A0A0A` (black)
+- Secondary Background: `#1A1A1A` (dark gray)
+- Accent Color: `#808080` (gray)
+- Accent Hover: `#A0A0A0` (lighter gray)
+- Text Primary: `#E5E5E5` (off-white)
+- Text Secondary: `#999999` (medium gray)
+- Border Color: `#333333` (dark gray)
 
 **Typography**:
 - Font Family: Segoe UI (Windows), SF Pro (Mac), fallback: sans-serif
@@ -115,6 +113,7 @@
 #### 3.1.1 Library Management
 - **Add Folders**: File > Add Folder (multi-select dialog)
 - **Remove Folders**: Right-click folder > Remove
+- **Folder Persistence**: Folders stored in JSON config file (`~/.monovault/config.json`)
 - **Scan Folders**: Recursive scan for MP3, FLAC files
 - **Metadata Reading**: Extract ID3 (MP3), Vorbis (FLAC) tags
 - **Album Art**: FLAC uses `audio.pictures`, MP3 uses APIC frame (all formats working)
