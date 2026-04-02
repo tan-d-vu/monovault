@@ -52,7 +52,7 @@ class MainWindow(QMainWindow):
         self._is_seeking = False
 
         self._splitter = None
-        
+
         self._setup_ui()
         self._load_library()
 
@@ -77,8 +77,11 @@ class MainWindow(QMainWindow):
         splitter.addWidget(self.track_table)
         splitter.addWidget(self.details_panel)
         splitter.setSizes([200, 500, 280])
+        splitter.setStretchFactor(0, 0)
+        splitter.setStretchFactor(1, 1)
+        splitter.setStretchFactor(2, 0)
+        splitter.setHandleWidth(1)
         self._splitter = splitter
-        
 
         main_layout.addWidget(self._splitter)
 
@@ -310,6 +313,8 @@ class MainWindow(QMainWindow):
     def _load_tracks(self):
         self.all_tracks = self.library.get_all_tracks()
         self._populate_track_table(self.all_tracks)
+        if self.all_tracks:
+            self.track_table_widget.selectRow(0)
 
     def _populate_track_table(self, tracks: list[Track]):
         self.track_table_widget.setRowCount(len(tracks))
