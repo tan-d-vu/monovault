@@ -23,6 +23,8 @@ from PyQt6.QtWidgets import (
     QHeaderView,
     QAbstractItemView,
     QMenu,
+    QScrollArea,
+    QSizePolicy,
 )
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QSize, QPoint, QEvent
 from PyQt6.QtGui import QAction, QMouseEvent, QKeyEvent, QFontMetrics
@@ -100,10 +102,6 @@ class MainWindow(QMainWindow):
         menubar = self.menuBar()
         options_menu = menubar.addMenu("Options")
 
-        add_folder = QAction("Add Folder", self)
-        add_folder.triggered.connect(self._add_folder)
-        options_menu.addAction(add_folder)
-
         refresh = QAction("Refresh Library", self)
         refresh.triggered.connect(self._refresh_library)
         options_menu.addAction(refresh)
@@ -117,10 +115,12 @@ class MainWindow(QMainWindow):
     def _create_folder_panel(self) -> QWidget:
         panel = QFrame()
         panel.setFrameStyle(QFrame.Shape.NoFrame)
+        panel.setMinimumHeight(150)
         panel.setStyleSheet(f"background-color: {THEME['secondary_bg']};")
 
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(4)
 
         self.folder_tree_widget = QTreeWidget()
         self.folder_tree_widget.setHeaderHidden(True)
@@ -137,6 +137,14 @@ class MainWindow(QMainWindow):
             QHeaderView.ResizeMode.Fixed
         )
         layout.addWidget(self.folder_tree_widget)
+
+        self.add_folder_btn = QPushButton("Add Folder")
+        self.add_folder_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.add_folder_btn.setStyleSheet(
+            f"border: 1px solid {THEME['border']}; padding: 6px;"
+        )
+        self.add_folder_btn.clicked.connect(self._add_folder)
+        layout.addWidget(self.add_folder_btn)
 
         return panel
 
@@ -211,11 +219,29 @@ class MainWindow(QMainWindow):
         )
         layout.addWidget(categories_header)
 
+        self.categories_scroll = QScrollArea()
+        self.categories_scroll.setWidgetResizable(True)
+        self.categories_scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+        self.categories_scroll.setStyleSheet(f"""
+            QScrollArea {{
+                border: none;
+                background: transparent;
+            }}
+        """)
+        self.categories_scroll.setAlignment(Qt.AlignmentFlag.AlignTop)
+
         self.categories_container = QWidget()
+        self.categories_container.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum
+        )
         self.categories_layout = QVBoxLayout(self.categories_container)
         self.categories_layout.setContentsMargins(0, 0, 0, 0)
-        self.categories_layout.setSpacing(4)
-        layout.addWidget(self.categories_container)
+        self.categories_layout.setSpacing(2)
+        self.categories_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        self.categories_scroll.setWidget(self.categories_container)
+        layout.addWidget(self.categories_scroll)
 
         self.category_input = QLineEdit()
         self.category_input.setPlaceholderText("Add category...")

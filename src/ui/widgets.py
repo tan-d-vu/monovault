@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel, QPushButton
+from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel, QPushButton, QSizePolicy
 from PyQt6.QtCore import Qt, pyqtSignal
 from .styles import THEME
 
@@ -12,12 +12,13 @@ class CategoryPill(QWidget):
         self._setup_ui()
 
     def _setup_ui(self):
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.setStyleSheet(f"""
             QWidget {{
                 background-color: {THEME["accent"]};
-                border-radius: 12px;
-                padding: 4px 8px;
-            }}
+                border: 1px solid {THEME["border"]};
+                border-radius: 4px;
+                padding: 4px 8px;}}
         """)
         layout = QHBoxLayout(self)
         layout.setContentsMargins(8, 4, 4, 4)
