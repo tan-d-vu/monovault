@@ -1,0 +1,83 @@
+from typing import Optional
+from ..models.track import Track
+
+
+class LibraryManager:
+    def __init__(self):
+        self.tracks: dict[int, Track] = {}
+        self.next_id: int = 1
+        self.folders: list[str] = []
+
+    def add_folder(self, path: str) -> bool:
+        if path in self.folders:
+            return False
+        self.folders.append(path)
+        return True
+
+    def remove_folder(self, path: str):
+        self.folders = [f for f in self.folders if f != path]
+        self.tracks = {
+            tid: t for tid, t in self.tracks.items() if t.folder_path != path
+        }
+
+    def get_folders(self) -> list[str]:
+        return list(self.folders)
+
+    def add_track(self, track: Track) -> int:
+        for existing_id, existing_track in self.tracks.items():
+            if existing_track.file_path == track.file_path:
+                track.id = existing_id
+                self.tracks[existing_id] = track
+                return existing_id
+
+        track.id = self.next_id
+        self.tracks[self.next_id] = track
+        self.next_id += 1
+        return track.id
+
+    def update_track(self, track: Track):
+        if track.id in self.tracks:
+            self.tracks[track.id] = track
+
+    def get_all_tracks(self) -> list[Track]:
+        return list(self.tracks.values())
+
+    def get_track_by_id(self, track_id: int) -> Optional[Track]:
+        return self.tracks.get(track_id)
+
+    def get_track_by_path(self, file_path: str) -> Optional[Track]:
+        for track in self.tracks.values():
+            if track.file_path == file_path:
+                return track
+        return None
+
+    def search(self, query: str) -> list[Track]:
+        q = query.lower()
+        results = []
+        for track in self.tracks.values():
+            if (
+                q in track.title.lower()
+                or q in track.artist.lower()
+                or q in track.album.lower()
+                or any(q in cat.lower() for cat in track.categories)
+            ):
+                results.append(track)
+        return results
+
+    def get_tracks_by_artist(self, artist: str) -> list[Track]:
+        return [t for t in self.tracks.values() if t.artist.lower() == artist.lower()]
+
+    def get_tracks_with_categories(self, categories: list[str]) -> list[Track]:
+        if not categories:
+            return []
+        results = []
+        for track in self.tracks.values():
+            for cat in categories:
+                if cat.lower() in [c.lower() for c in track.categories]:
+                    results.append(track)
+                    break
+        return results
+
+    def clear(self):
+        self.tracks.clear()
+        self.next_id = 1
