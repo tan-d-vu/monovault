@@ -24,8 +24,8 @@ from PyQt6.QtWidgets import (
     QAbstractItemView,
     QMenu,
 )
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QSize, QPoint
-from PyQt6.QtGui import QAction, QMouseEvent
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QSize, QPoint, QEvent
+from PyQt6.QtGui import QAction, QMouseEvent, QKeyEvent, QFontMetrics
 
 from .styles import THEME, STYLESHEET
 from .widgets import CategoryPill, SuggestionButton
@@ -51,11 +51,13 @@ class MainWindow(QMainWindow):
         self.search_timer.timeout.connect(self._do_search)
         self._is_seeking = False
 
+        self._splitter = None
+        
         self._setup_ui()
         self._load_library()
 
     def _setup_ui(self):
-        self.setWindowTitle("MusicVault")
+        self.setWindowTitle("MonoVault")
         self.setMinimumSize(1000, 600)
         self.setStyleSheet(STYLESHEET)
 
@@ -75,8 +77,10 @@ class MainWindow(QMainWindow):
         splitter.addWidget(self.track_table)
         splitter.addWidget(self.details_panel)
         splitter.setSizes([200, 500, 280])
+        self._splitter = splitter
+        
 
-        main_layout.addWidget(splitter)
+        main_layout.addWidget(self._splitter)
 
         self.playback_bar = self._create_playback_bar()
 
@@ -84,28 +88,28 @@ class MainWindow(QMainWindow):
         overall_layout = QVBoxLayout(overall)
         overall_layout.setContentsMargins(4, 4, 4, 4)
         overall_layout.setSpacing(4)
-        overall_layout.addWidget(splitter)
+        overall_layout.addWidget(self._splitter, 1)
         overall_layout.addWidget(self.playback_bar)
 
         self.setCentralWidget(overall)
 
     def _create_menu(self):
         menubar = self.menuBar()
-        file_menu = menubar.addMenu("File")
+        options_menu = menubar.addMenu("Options")
 
         add_folder = QAction("Add Folder", self)
         add_folder.triggered.connect(self._add_folder)
-        file_menu.addAction(add_folder)
+        options_menu.addAction(add_folder)
 
         refresh = QAction("Refresh Library", self)
         refresh.triggered.connect(self._refresh_library)
-        file_menu.addAction(refresh)
+        options_menu.addAction(refresh)
 
-        file_menu.addSeparator()
+        options_menu.addSeparator()
 
         quit = QAction("Quit", self)
         quit.triggered.connect(self.close)
-        file_menu.addAction(quit)
+        options_menu.addAction(quit)
 
     def _create_folder_panel(self) -> QWidget:
         panel = QFrame()
@@ -115,19 +119,19 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(8, 8, 8, 8)
 
-        header = QLabel("Folders")
-        header.setStyleSheet(f"font-weight: bold; color: {THEME['text_secondary']};")
-        layout.addWidget(header)
-
         self.folder_tree_widget = QTreeWidget()
         self.folder_tree_widget.setHeaderHidden(True)
         self.folder_tree_widget.setAlternatingRowColors(True)
+        self.folder_tree_widget.setIndentation(0)
         self.folder_tree_widget.itemClicked.connect(self._on_folder_clicked)
         self.folder_tree_widget.setContextMenuPolicy(
             Qt.ContextMenuPolicy.CustomContextMenu
         )
         self.folder_tree_widget.customContextMenuRequested.connect(
             self._on_folder_context_menu
+        )
+        self.folder_tree_widget.header().setSectionResizeMode(
+            QHeaderView.ResizeMode.Fixed
         )
         layout.addWidget(self.folder_tree_widget)
 
@@ -147,9 +151,9 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.search_input)
 
         self.track_table_widget = QTableWidget()
-        self.track_table_widget.setColumnCount(5)
+        self.track_table_widget.setColumnCount(4)
         self.track_table_widget.setHorizontalHeaderLabels(
-            ["#", "Title", "Artist", "Album", "Duration"]
+            ["#", "Title", "Artist", "Duration"]
         )
         self.track_table_widget.setSelectionBehavior(
             QAbstractItemView.SelectionBehavior.SelectRows
@@ -157,11 +161,18 @@ class MainWindow(QMainWindow):
         self.track_table_widget.setSelectionMode(
             QAbstractItemView.SelectionMode.ExtendedSelection
         )
+        self.track_table_widget.setEditTriggers(
+            QAbstractItemView.EditTrigger.NoEditTriggers
+        )
         self.track_table_widget.setAlternatingRowColors(True)
         self.track_table_widget.horizontalHeader().setStretchLastSection(True)
+        self.track_table_widget.horizontalHeader().setSectionResizeMode(
+            0, QHeaderView.ResizeMode.ResizeToContents
+        )
         self.track_table_widget.verticalHeader().hide()
         self.track_table_widget.itemDoubleClicked.connect(self._on_track_double_clicked)
         self.track_table_widget.itemSelectionChanged.connect(self._on_track_selected)
+        self.track_table_widget.installEventFilter(self)
         layout.addWidget(self.track_table_widget)
 
         return panel
@@ -208,11 +219,11 @@ class MainWindow(QMainWindow):
         self.category_input.returnPressed.connect(self._add_category)
         layout.addWidget(self.category_input)
 
-        suggestions_header = QLabel("Suggested Categories")
-        suggestions_header.setStyleSheet(
+        self.suggestions_header = QLabel("Suggested Categories")
+        self.suggestions_header.setStyleSheet(
             f"font-weight: bold; color: {THEME['text_secondary']};"
         )
-        layout.addWidget(suggestions_header)
+        layout.addWidget(self.suggestions_header)
 
         self.suggestions_container = QWidget()
         self.suggestions_layout = QVBoxLayout(self.suggestions_container)
@@ -226,6 +237,7 @@ class MainWindow(QMainWindow):
 
     def _create_playback_bar(self) -> QWidget:
         bar = QFrame()
+        bar.setFixedHeight(50)
         bar.setStyleSheet(
             f"background-color: {THEME['secondary_bg']}; border-top: 1px solid {THEME['border']};"
         )
@@ -239,20 +251,10 @@ class MainWindow(QMainWindow):
         self.now_playing_label.setFixedWidth(200)
         layout.addWidget(self.now_playing_label)
 
-        self.prev_btn = QPushButton("<<")
-        self.prev_btn.setFixedWidth(40)
-        self.prev_btn.clicked.connect(self._prev_track)
-        layout.addWidget(self.prev_btn)
-
         self.play_btn = QPushButton("Play")
         self.play_btn.setFixedWidth(60)
         self.play_btn.clicked.connect(self._toggle_playback)
         layout.addWidget(self.play_btn)
-
-        self.next_btn = QPushButton(">>")
-        self.next_btn.setFixedWidth(40)
-        self.next_btn.clicked.connect(self._next_track)
-        layout.addWidget(self.next_btn)
 
         self.position_slider = QSlider(Qt.Orientation.Horizontal)
         self.position_slider.setRange(0, 1000)
@@ -293,6 +295,14 @@ class MainWindow(QMainWindow):
             item.setData(0, Qt.ItemDataRole.UserRole, folder)
             self.folder_tree_widget.addTopLevelItem(item)
 
+        if folders:
+            font = self.folder_tree_widget.font()
+            metrics = QFontMetrics(font)
+            max_width = max(metrics.horizontalAdvance(f) for f in folders)
+            folder_width = max_width + 40
+            self.folder_tree_widget.setColumnWidth(0, folder_width)
+            self._splitter.setSizes([folder_width + 20, 500, 280])
+
         for folder in folders:
             self._scan_folder(folder)
         self._load_tracks()
@@ -308,12 +318,11 @@ class MainWindow(QMainWindow):
             self.track_table_widget.setItem(i, 0, QTableWidgetItem(str(i + 1)))
             self.track_table_widget.setItem(i, 1, QTableWidgetItem(track.title))
             self.track_table_widget.setItem(i, 2, QTableWidgetItem(track.artist))
-            self.track_table_widget.setItem(i, 3, QTableWidgetItem(track.album))
             self.track_table_widget.setItem(
-                i, 4, QTableWidgetItem(track.duration_formatted)
+                i, 3, QTableWidgetItem(track.duration_formatted)
             )
 
-            for col in range(5):
+            for col in range(4):
                 item = self.track_table_widget.item(i, col)
                 if item:
                     item.setData(Qt.ItemDataRole.UserRole, track)
@@ -533,10 +542,16 @@ class MainWindow(QMainWindow):
                 child.widget().deleteLater()
 
         suggestions = self.categorizer.get_suggestions(track)
-        for cat, source in suggestions:
-            btn = SuggestionButton(cat, source)
-            btn.clicked_with_source.connect(self._on_suggestion_clicked)
-            self.suggestions_layout.addWidget(btn)
+        if not suggestions:
+            self.suggestions_header.hide()
+            self.suggestions_container.hide()
+        else:
+            self.suggestions_header.show()
+            self.suggestions_container.show()
+            for cat, source in suggestions:
+                btn = SuggestionButton(cat, source)
+                btn.clicked_with_source.connect(self._on_suggestion_clicked)
+                self.suggestions_layout.addWidget(btn)
 
     def _add_category(self):
         if not self.current_track:
@@ -569,7 +584,7 @@ class MainWindow(QMainWindow):
             item = self.track_table_widget.item(i, 0)
             stored = item.data(Qt.ItemDataRole.UserRole) if item else None
             if stored and stored.id == track.id:
-                for col in range(5):
+                for col in range(4):
                     item = self.track_table_widget.item(i, col)
                     if item:
                         item.setData(Qt.ItemDataRole.UserRole, track)
@@ -578,6 +593,21 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):
         self.playback.stop()
         event.accept()
+
+    def eventFilter(self, obj, event):
+        if obj == self.track_table_widget and event.type() == QEvent.Type.KeyPress:
+            if event.key() == Qt.Key.Key_Enter or event.key() == Qt.Key.Key_Return:
+                self._play_selected_track()
+                return True
+        return super().eventFilter(obj, event)
+
+    def _play_selected_track(self):
+        selected = self.track_table_widget.selectedItems()
+        if selected:
+            row = selected[0].row()
+            track = self.track_table_widget.item(row, 0).data(Qt.ItemDataRole.UserRole)
+            if track:
+                self._play_track(track)
 
 
 def main():
