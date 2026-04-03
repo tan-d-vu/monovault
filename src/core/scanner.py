@@ -3,12 +3,14 @@ from typing import Optional
 import os
 
 from .metadata import is_supported, read_metadata, read_comment, read_comment_raw
+from .library_store import LibraryStore
 from ..models.track import Track
 
 
 class Scanner:
-    def __init__(self):
+    def __init__(self, library_store: Optional[LibraryStore] = None):
         self.progress_callback: Optional[callable] = None
+        self._store = library_store
 
     def scan_folder(self, folder_path: str) -> list[Track]:
         folder = Path(folder_path)
@@ -51,6 +53,8 @@ class Scanner:
         duration = metadata.get("duration", 0.0)
         album_art = metadata.get("album_art")
 
+        date_added = self._store.record_if_new(file_path) if self._store else ""
+
         return Track(
             id=0,
             file_path=file_path,
@@ -62,4 +66,5 @@ class Scanner:
             album_art=album_art,
             folder_path=folder_path,
             comments=comments,
+            date_added=date_added,
         )

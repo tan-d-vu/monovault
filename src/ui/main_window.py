@@ -34,6 +34,7 @@ from PyQt6.QtGui import QAction, QMouseEvent, QKeyEvent, QFontMetrics, QIcon
 from .styles import THEME, STYLESHEET
 from .widgets import CategoryPill, SuggestionButton
 from ..core.library import LibraryManager
+from ..core.library_store import LibraryStore
 from ..core.scanner import Scanner
 from ..core.playback import PlaybackEngine
 from ..core.categorizer import Categorizer
@@ -45,7 +46,8 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.library = LibraryManager()
-        self.scanner = Scanner()
+        self.library_store = LibraryStore()
+        self.scanner = Scanner(library_store=self.library_store)
         self.playback = PlaybackEngine()
         self.categorizer = Categorizer(self.library)
 
@@ -165,9 +167,9 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.search_input)
 
         self.track_table_widget = QTableWidget()
-        self.track_table_widget.setColumnCount(5)
+        self.track_table_widget.setColumnCount(6)
         self.track_table_widget.setHorizontalHeaderLabels(
-            ["#", "Title", "Artist", "Duration", "Comments"]
+            ["#", "Title", "Artist", "Duration", "Comments", "Added"]
         )
         self.track_table_widget.setSelectionBehavior(
             QAbstractItemView.SelectionBehavior.SelectRows
@@ -179,12 +181,19 @@ class MainWindow(QMainWindow):
             QAbstractItemView.EditTrigger.NoEditTriggers
         )
         self.track_table_widget.setAlternatingRowColors(True)
-        self.track_table_widget.horizontalHeader().setStretchLastSection(True)
+        self.track_table_widget.setSortingEnabled(True)
+        self.track_table_widget.horizontalHeader().setStretchLastSection(False)
         self.track_table_widget.horizontalHeader().setSectionResizeMode(
             0, QHeaderView.ResizeMode.ResizeToContents
         )
         self.track_table_widget.horizontalHeader().setSectionResizeMode(
+            1, QHeaderView.ResizeMode.Stretch
+        )
+        self.track_table_widget.horizontalHeader().setSectionResizeMode(
             4, QHeaderView.ResizeMode.ResizeToContents
+        )
+        self.track_table_widget.horizontalHeader().setSectionResizeMode(
+            5, QHeaderView.ResizeMode.ResizeToContents
         )
         self.track_table_widget.verticalHeader().hide()
         self.track_table_widget.itemDoubleClicked.connect(self._on_track_double_clicked)
@@ -218,6 +227,11 @@ class MainWindow(QMainWindow):
         self.track_info = QLabel("")
         self.track_info.setStyleSheet(f"color: {THEME['text_secondary']};")
         layout.addWidget(self.track_info)
+
+        self.track_date_added = QLabel("")
+        self.track_date_added.setStyleSheet(f"color: {THEME['text_secondary']};")
+        self.track_date_added.hide()
+        layout.addWidget(self.track_date_added)
 
         categories_header = QLabel("Categories")
         categories_header.setStyleSheet(
@@ -378,7 +392,11 @@ class MainWindow(QMainWindow):
                 i, 4, QTableWidgetItem(track.comments or "")
             )
 
-            for col in range(5):
+            added_item = QTableWidgetItem(track.date_added or "")
+            added_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.track_table_widget.setItem(i, 5, added_item)
+
+            for col in range(6):
                 item = self.track_table_widget.item(i, col)
                 if item:
                     item.setData(Qt.ItemDataRole.UserRole, track)
@@ -582,6 +600,12 @@ class MainWindow(QMainWindow):
             f"{track.artist} - {track.album} ({track.duration_formatted})"
         )
 
+        if track.date_added:
+            self.track_date_added.setText(f"Added: {track.date_added}")
+            self.track_date_added.show()
+        else:
+            self.track_date_added.hide()
+
         if track.album_art:
             from PyQt6.QtGui import QPixmap, QImage
 
@@ -667,7 +691,7 @@ class MainWindow(QMainWindow):
             if stored and stored.id == track.id:
                 comments = " ".join(track.categories)
                 self.track_table_widget.item(i, 4).setText(comments)
-                for col in range(5):
+                for col in range(6):
                     item = self.track_table_widget.item(i, col)
                     if item:
                         item.setData(Qt.ItemDataRole.UserRole, track)
