@@ -77,5 +77,5 @@ class PlaybackEngine(QObject):
         self._duration = duration
         self.duration_changed.emit(duration)
 
-    def _on_state_changed(self, state: int):
+    def _on_state_changed(self, state: QMediaPlayer.PlaybackState) -> None:
         self.playback_state_changed.emit(state)

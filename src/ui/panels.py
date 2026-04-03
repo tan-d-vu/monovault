@@ -17,8 +17,8 @@ from PyQt6.QtWidgets import (
     QAbstractItemView,
     QScrollArea,
     QSizePolicy,
+    QStyle,
 )
-from PyQt6.QtWidgets import QStyle
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFontMetrics, QIcon, QPixmap, QImage
 
@@ -124,7 +124,7 @@ def create_details_panel() -> tuple[
     layout.setSpacing(12)
 
     album_art_label = QLabel()
-    album_art_label.setFixedSize(200, 200)
+    album_art_label.setFixedSize(300, 300)
     album_art_label.setStyleSheet(
         f"background-color: {THEME['border']}; border-radius: 4px;"
     )
@@ -236,6 +236,9 @@ def create_playback_bar() -> tuple[
         "  background-color: #333333;"
         "}"
     )
+    
+    update_play_icon(play_btn, False)
+
     layout.addWidget(play_btn)
 
     position_slider = QSlider(Qt.Orientation.Horizontal)
@@ -300,8 +303,8 @@ def update_track_details_ui(
         if not qimg.isNull():
             pixmap = QPixmap.fromImage(qimg)
             scaled = pixmap.scaled(
-                200,
-                200,
+                300,
+                300,
                 Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.SmoothTransformation,
             )

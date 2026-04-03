@@ -45,11 +45,17 @@ class PlaybackController(QObject):
     def set_track_list(self, tracks: list[Track]) -> None:
         self._track_list = list(tracks)
 
+    def set_current_track(self, track: Track) -> None:
+        self._current_track = track
+        self._engine.load_track(track.file_path)
+
     def play_track(self, track: Track) -> None:
         self._current_track = track
         self._engine.load_track(track.file_path)
         self._engine.play()
-        self.now_playing_changed.emit(f"{track.title} - {track.artist}")
+        self.play_state_changed.emit(True)
+        self.now_playing_changed.emit("{} - {}".format(track.title, track.artist))
+        
         if self._bus:
             from ...core.events import TrackPlaybackStarted
 
@@ -132,10 +138,11 @@ class PlaybackController(QObject):
         self.slider_position_changed.emit(0)
         self.time_display_changed.emit(self._format_time(0, duration))
 
-    def _on_playback_state_changed(self, state: int) -> None:
+    def _on_playback_state_changed(self, state) -> None:
         from PyQt6.QtMultimedia import QMediaPlayer
 
-        is_playing = state == QMediaPlayer.PlaybackState.PlayingState
+        actual_state = self._engine.player.playbackState()
+        is_playing = actual_state == QMediaPlayer.PlaybackState.PlayingState
         self.play_state_changed.emit(is_playing)
 
     @staticmethod

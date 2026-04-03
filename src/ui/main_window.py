@@ -1,4 +1,6 @@
 import sys
+import subprocess
+import platform
 
 from PyQt6.QtWidgets import (
     QApplication,
@@ -11,7 +13,8 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QMenu,
 )
-from PyQt6.QtCore import Qt, QEvent
+from PyQt6.QtCore import Qt, QEvent, QUrl
+from PyQt6.QtGui import QDesktopServices
 
 from .styles import STYLESHEET
 from .panels import (
@@ -221,9 +224,13 @@ class MainWindow(QMainWindow):
         if not folder:
             return
         menu = QMenu(self)
+        show_action = menu.addAction("Show Folder")
+        menu.addSeparator()
         remove_action = menu.addAction("Remove Folder")
         action = menu.exec(self.folder_tree_widget.mapToGlobal(pos))
-        if action == remove_action:
+        if action == show_action:
+            self._open_folder_in_explorer(folder)
+        elif action == remove_action:
             self._remove_folder(folder)
 
     def _remove_folder(self, folder: str):
@@ -237,6 +244,18 @@ class MainWindow(QMainWindow):
             self.library.remove_folder(folder)
             self._load_library()
             self._load_tracks()
+
+    def _open_folder_in_explorer(self, folder: str):
+        system = platform.system()
+        try:
+            if system == "Linux":
+                subprocess.run(["xdg-open", folder], check=False)
+            elif system == "Windows":
+                subprocess.run(["explorer", folder], check=False)
+            elif system == "Darwin":
+                subprocess.run(["open", folder], check=False)
+        except Exception:
+            QDesktopServices.openUrl(QUrl.fromLocalFile(folder))
 
     def _on_search_results(self, tracks: list[Track]) -> None:
         self.all_tracks = tracks
@@ -256,6 +275,10 @@ class MainWindow(QMainWindow):
             track = self.track_table_widget.item(row, 0).data(Qt.ItemDataRole.UserRole)
             if track:
                 self.category_ctrl.select_track(track)
+                # Set the track in playback controller so play button works for default selected track on app start
+                if self.playback_ctrl.current_track == None:
+                    self.now_playing_label.setText("{} - {}".format(track.title, track.artist))
+                    self.playback_ctrl.set_current_track(track)
 
     def _update_play_icon(self, is_playing: bool):
         update_play_icon(self.play_btn, is_playing)
