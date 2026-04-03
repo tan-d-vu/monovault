@@ -115,6 +115,7 @@ class MainWindow(QMainWindow):
         splitter.setStretchFactor(1, 1)
         splitter.setStretchFactor(2, 0)
         splitter.setHandleWidth(1)
+        splitter.setCollapsible(2, False)
         self._splitter = splitter
         main_layout.addWidget(self._splitter)
 
@@ -277,7 +278,9 @@ class MainWindow(QMainWindow):
                 self.category_ctrl.select_track(track)
                 # Set the track in playback controller so play button works for default selected track on app start
                 if self.playback_ctrl.current_track == None:
-                    self.now_playing_label.setText("{} - {}".format(track.title, track.artist))
+                    self.now_playing_label.setText(
+                        "{} - {}".format(track.title, track.artist)
+                    )
                     self.playback_ctrl.set_current_track(track)
 
     def _update_play_icon(self, is_playing: bool):
@@ -359,3 +362,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+

@@ -74,9 +74,9 @@ def create_track_table() -> tuple[QWidget, QLineEdit, QTableWidget]:
     layout.addWidget(search_input)
 
     track_table_widget = QTableWidget()
-    track_table_widget.setColumnCount(6)
+    track_table_widget.setColumnCount(7)
     track_table_widget.setHorizontalHeaderLabels(
-        ["#", "Title", "Artist", "Duration", "Comments", "Added"]
+        ["#", "Title", "Artist", "Duration", "Comments", "Location", "Date Added"]
     )
     track_table_widget.setSelectionBehavior(
         QAbstractItemView.SelectionBehavior.SelectRows
@@ -95,7 +95,8 @@ def create_track_table() -> tuple[QWidget, QLineEdit, QTableWidget]:
     header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
     header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
     header.setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
-    header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
+    header.setSectionResizeMode(5, QHeaderView.ResizeMode.Fixed)
+    header.setSectionResizeMode(6, QHeaderView.ResizeMode.Interactive)
 
     track_table_widget.verticalHeader().hide()
     layout.addWidget(track_table_widget)
@@ -236,7 +237,7 @@ def create_playback_bar() -> tuple[
         "  background-color: #333333;"
         "}"
     )
-    
+
     update_play_icon(play_btn, False)
 
     layout.addWidget(play_btn)
@@ -373,16 +374,22 @@ def populate_track_table(table: QTableWidget, tracks: list[Track]) -> None:
 
         table.setItem(i, 4, QTableWidgetItem(track.comments or ""))
 
+        table.setItem(i, 5, QTableWidgetItem(track.location))
+
         added_item = QTableWidgetItem(track.date_added or "")
         added_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-        table.setItem(i, 5, added_item)
+        added_item.setData(
+            Qt.ItemDataRole.TextAlignmentRole,
+            int(Qt.AlignmentFlag.AlignCenter) | int(Qt.AlignmentFlag.AlignVCenter),
+        )
+        table.setItem(i, 6, added_item)
 
-        for col in range(6):
+        for col in range(7):
             item = table.item(i, col)
             if item:
                 item.setData(Qt.ItemDataRole.UserRole, track)
 
-    for col in range(6):
+    for col in range(7):
         if col == 4:
             continue
         max_width = 0
@@ -392,7 +399,8 @@ def populate_track_table(table: QTableWidget, tracks: list[Track]) -> None:
                 width = table.fontMetrics().boundingRect(item.text()).width()
                 max_width = max(max_width, width)
         if max_width > 0:
-            table.setColumnWidth(col, max_width)
+            padding = 30 if col in (5, 6) else 4
+            table.setColumnWidth(col, max_width + padding)
 
 
 def populate_folder_tree(tree: QTreeWidget, folders: list[str]) -> None:

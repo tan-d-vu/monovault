@@ -17,7 +17,7 @@ class SearchController(QObject):
         self,
         repository: ITrackRepository,
         bus: Optional[EventBus] = None,
-        debounce_ms: int = 1500,
+        debounce_ms: int = 0,
         parent: Optional[QObject] = None,
     ) -> None:
         super().__init__(parent)
