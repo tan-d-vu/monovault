@@ -16,14 +16,13 @@ MusicVault is a lightweight desktop music file manager with manual categorizatio
 
 ```
 monovault/
-├── venv/                    # Virtual environment (created after setup)
+├── venv/                    # Virtual environment
 ├── src/
-│   ├── models/              # Data models
-│   │   └── track.py         # Track dataclass
+│   ├── models/              # Data models (Track dataclass)
 │   ├── core/                # Business logic
 │   │   ├── config.py        # JSON config for folders
 │   │   ├── library.py       # In-memory library manager
-│   │   ├── library_store.py # File mtime cache for change detection
+│   │   ├── library_store.py # File mtime cache
 │   │   ├── metadata.py      # Audio metadata read/write
 │   │   ├── scanner.py       # Library folder scanner
 │   │   ├── playback.py      # Audio playback engine
@@ -32,127 +31,154 @@ monovault/
 │       ├── main_window.py   # Main application window
 │       ├── widgets.py       # Custom widgets
 │       └── styles.py        # UI theme/styles
+├── tests/                   # Test suite
 ├── resources/               # Icons, images
 ├── pyproject.toml           # Project configuration
 ├── SPEC.md                  # Full specification
 └── AGENTS.md                # This file
 ```
 
-## Setup Instructions
-
-### 1. Create and Activate Virtual Environment
+## Build, Test & Lint Commands
 
 ```bash
-cd /home/tdv/projects/monovault
-python3 -m venv venv
-source venv/bin/activate  # Linux/Mac
-# venv\Scripts\activate   # Windows
-```
+# Install dependencies (including dev)
+pip install -e ".[dev]"
 
-### 2. Install Dependencies
-
-```bash
-pip install PyQt6 mutagen
-```
-
-### 3. Run Development Mode
-
-```bash
+# Run the application
 python -m src.ui.main_window
-```
 
-### 4. Build Executable (Windows)
+# Run all tests
+pytest
 
-```bash
-pip install pyinstaller
+# Run a single test file
+pytest tests/core/test_library.py
+
+# Run a single test
+pytest tests/core/test_library.py::TestLibraryManager::test_add_track_returns_positive_int
+
+# Run tests by marker
+pytest -m unit
+pytest -m integration
+
+# Run with coverage
+pytest --cov=src --cov-report=term-missing
+
+# Lint with ruff
+ruff check src/ tests/
+
+# Auto-fix lint issues
+ruff check --fix src/ tests/
+
+# Format code
+ruff format src/ tests/
+
+# Build executable (Windows)
 pyinstaller --onefile --windowed src/ui/main_window.py
 ```
 
+## Code Style Guidelines
+
+### Imports
+- Use absolute imports: `from src.core.library import LibraryManager`
+- Group imports in order: stdlib, third-party, local
+- Sort alphabetically within groups
+- One module per line
+
+### Formatting
+- Line length: 100 characters max
+- Use 4 spaces for indentation (no tabs)
+- Use ruff for formatting: `ruff format`
+- One blank line between top-level definitions
+- No trailing whitespace
+
+### Types
+- Use type hints for all function signatures
+- Use `Optional[X]` instead of `X | None`
+- Use built-in types directly: `list[str]`, `dict[str, int]`
+- Use dataclasses for simple data containers
+
+### Naming Conventions
+- **Classes**: `PascalCase` (e.g., `LibraryManager`)
+- **Functions/methods**: `snake_case` (e.g., `add_track`)
+- **Constants**: `UPPER_SNAKE_CASE`
+- **Private members**: prefix with `_` (e.g., `_tracks`)
+- **Files**: `snake_case.py`
+
+### Error Handling
+- Use exceptions for exceptional cases, not flow control
+- Catch specific exceptions, not bare `Exception`
+- Log errors before re-raising when appropriate
+- Never swallow exceptions silently without logging
+
+### Code Patterns
+
+#### Dataclass for models
+```python
+@dataclass
+class Track:
+    id: int
+    file_path: str
+    title: str
+    artist: str
+    album: str
+    duration: float
+    categories: list[str]
+    album_art: Optional[bytes]
+    folder_path: str
+    comments: str = ""
+    date_added: str = ""
+```
+
+#### PyQt signal connections
+```python
+self.search_input.textChanged.connect(self._on_search_changed)
+```
+
+#### Protocol/Interface pattern
+```python
+from src.core.interfaces import ITrackRepository
+
+class LibraryManager(ITrackRepository):
+    ...
+```
+
+### Testing Guidelines
+- Use pytest with markers: `@pytest.mark.unit`, `@pytest.mark.integration`
+- Use fixtures from `conftest.py`: `sample_track`, `sample_tracks`, `qapp`
+- Test one thing per test function
+- Use descriptive test names: `test_<method>_<expected_behavior>`
+
 ## Architecture Decisions
 
-### 1. PyQt6 over Tkinter/PySimpleGUI
-- **Reason**: Rich UI capabilities, native look, excellent documentation
-- **Alternative considered**: CustomTkinter (simpler but less flexible)
+### JSON Config Location
+- `~/.monovault/config.json` (Linux/macOS), `%APPDATA%/monovault/config.json` (Windows)
+- Format: `{"folders": ["/path/to/music1"]}`
 
-### 2. mutagen for metadata
-- **Reason**: Mature library supporting MP3 (ID3), FLAC (Vorbis)
-- **Alternative**: eyeD3 (MP3 only), tinytag (read-only)
+### Category Storage
+- Uses COMMENT tag (COMM for MP3, COMMENT for FLAC)
+- Format: space-separated words ("rock favorite workout")
 
-### 3. In-memory storage
-- **Reason**: 2000+ tracks uses only ~700KB memory, simpler than SQLite
-- **Design**: All tracks kept in memory; audio files remain source of truth
+### Category Suggestions
+- Max 5 suggestions from same-artist tracks and shared categories
+- Lowercase, deduplicated, excludes existing categories
 
-### 4. JSON config file for folder persistence
-- **Location**: `~/.monovault/config.json` (Linux/macOS), `%APPDATA%/monovault/config.json` (Windows)
-- **Format**: `{"folders": ["/path/to/music1", "/path/to/music2"]}`
-- **Behavior**: Created on first run; folders loaded automatically on startup
-
-### 5. COMMENT tag for categories
-- **Reason**: COMM for MP3, COMMENT for FLAC - user-editable in other apps
-- **Format**: Space-separated words (e.g., "rock favorite workout")
-
-### 6. Category suggestion algorithm
-- **Source 1**: Categories from tracks with same artist
-- **Source 2**: Categories from tracks sharing any category
-- **Limit**: Max 5 suggestions
-- **Normalization**: Lowercase, deduplicated, exclude existing
-
-### 6. Debounced search (1.5s)
-- **Reason**: Performance for large libraries; no enter key needed
-- **Implementation**: QTimer with single shot
+### Search
+- Debounced 1.5s with QTimer.singleShot
+- Case-insensitive substring matching on title, artist, album, categories
 
 ## Key Modules
 
-### library.py
-- `add_folder(path)` - Add folder to library (saves to config)
-- `remove_folder(path)` - Remove folder from library (updates config)
-- `get_folders()` - Get list of configured folders
-- `add_track(track)` - Add track (handles duplicates by file_path)
-- `get_all_tracks()` - Get all tracks
-- `search(query)` - Search by title, artist, album, category
-- `get_tracks_by_artist(artist)` - Get tracks by artist
-- `get_tracks_with_categories(categories)` - Get tracks with matching categories
-- `update_track(track)` - Update track in memory
-- `clear()` - Clear all tracks
-
-### config.py
-- JSON config file at `~/.monovault/config.json`
-- `add_folder(path)` - Add folder to config
-- `remove_folder(path)` - Remove folder from config
-- `get_folders()` - Get saved folders
-
-### library_store.py
-- JSON cache file at `~/.monovault/library.json`
-- `record_if_new(file_path)` - Record file addition date
-- `get(file_path)` - Get stored addition date for file
-- Tracks when files were added to the library
-
-### metadata.py
-- `read_metadata(path)` - Extract title, artist, album, duration, art
-- `write_comment(path, categories)` - Write COMMENT tag
-- `read_comment(path)` - Read COMMENT tag
-- FLAC uses `audio.pictures` for album art (not tags)
-
-### scanner.py
-- `scan_folder(path)` - Recursively find audio files
-- `process_file(file_path, folder_path)` - Process single file
-
-### playback.py
-- Wraps QMediaPlayer for audio playback
-- Volume, seek, play/pause/stop controls
-
-### categorizer.py
-- `get_suggestions(track)` - Return 5 suggestions
-- Uses library for artist/category lookups
-
-## Running Tests
-
-```bash
-# TBD - tests to be added
-```
+| Module | Purpose |
+|--------|---------|
+| `library.py` | In-memory track storage, search, deduplication |
+| `config.py` | JSON config file management |
+| `metadata.py` | Audio file metadata read/write via mutagen |
+| `scanner.py` | Recursive folder scanning for audio files |
+| `playback.py` | QMediaPlayer wrapper |
+| `categorizer.py` | Category suggestion algorithm |
 
 ## Known Limitations
 
 - No real-time metadata change detection (manual refresh only)
-- Playback: basic controls (no equalizer, no playlist)
+- Playback: basic controls only (no equalizer, playlist)
 - Search: simple string matching, no fuzzy search
