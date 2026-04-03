@@ -102,19 +102,8 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(overall)
 
     def _create_menu(self):
-        menubar = self.menuBar()
-        options_menu = menubar.addMenu("Options")
-
-        refresh = QAction("Refresh Library", self)
-        refresh.triggered.connect(self._refresh_library)
-        options_menu.addAction(refresh)
-
-        options_menu.addSeparator()
-
-        quit = QAction("Quit", self)
-        quit.triggered.connect(self.close)
-        options_menu.addAction(quit)
-
+        return  # No menu for now
+    
     def _create_folder_panel(self) -> QWidget:
         panel = QFrame()
         panel.setFrameStyle(QFrame.Shape.NoFrame)
@@ -147,7 +136,18 @@ class MainWindow(QMainWindow):
             f"border: 1px solid {THEME['border']}; padding: 6px;"
         )
         self.add_folder_btn.clicked.connect(self._add_folder)
-        layout.addWidget(self.add_folder_btn)
+
+        self.refresh_btn = QPushButton("Refresh")
+        self.refresh_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.refresh_btn.setStyleSheet(
+            f"border: 1px solid {THEME['border']}; padding: 6px;"
+        )
+        self.refresh_btn.clicked.connect(self._refresh_library)
+
+        button_layout = QHBoxLayout()
+        button_layout.addWidget(self.add_folder_btn, 1)
+        button_layout.addWidget(self.refresh_btn, 1)
+        layout.addLayout(button_layout)
 
         return panel
 
