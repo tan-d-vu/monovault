@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import Optional
 import os
 
-from .metadata import is_supported, read_metadata, read_comment
+from .metadata import is_supported, read_metadata, read_comment, read_comment_raw
 from ..models.track import Track
 
 
@@ -43,6 +43,7 @@ class Scanner:
             return None
 
         categories = read_comment(file_path)
+        comments = read_comment_raw(file_path)
 
         title = metadata.get("title", "") or Path(file_path).stem
         artist = metadata.get("artist", "Unknown")
@@ -60,4 +61,5 @@ class Scanner:
             categories=categories,
             album_art=album_art,
             folder_path=folder_path,
+            comments=comments,
         )

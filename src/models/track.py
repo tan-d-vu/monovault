@@ -14,6 +14,7 @@ class Track:
     categories: list[str]
     album_art: Optional[bytes]
     folder_path: str
+    comments: str = ""
 
     @property
     def filename(self) -> str:

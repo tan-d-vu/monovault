@@ -25,9 +25,11 @@ from PyQt6.QtWidgets import (
     QMenu,
     QScrollArea,
     QSizePolicy,
+    QTextEdit,
+    QStyle,
 )
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QSize, QPoint, QEvent
-from PyQt6.QtGui import QAction, QMouseEvent, QKeyEvent, QFontMetrics
+from PyQt6.QtGui import QAction, QMouseEvent, QKeyEvent, QFontMetrics, QIcon
 
 from .styles import THEME, STYLESHEET
 from .widgets import CategoryPill, SuggestionButton
@@ -35,6 +37,7 @@ from ..core.library import LibraryManager
 from ..core.scanner import Scanner
 from ..core.playback import PlaybackEngine
 from ..core.categorizer import Categorizer
+from ..core.metadata import write_comments
 from ..models.track import Track
 
 
@@ -162,9 +165,9 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.search_input)
 
         self.track_table_widget = QTableWidget()
-        self.track_table_widget.setColumnCount(4)
+        self.track_table_widget.setColumnCount(5)
         self.track_table_widget.setHorizontalHeaderLabels(
-            ["#", "Title", "Artist", "Duration"]
+            ["#", "Title", "Artist", "Duration", "Comments"]
         )
         self.track_table_widget.setSelectionBehavior(
             QAbstractItemView.SelectionBehavior.SelectRows
@@ -179,6 +182,9 @@ class MainWindow(QMainWindow):
         self.track_table_widget.horizontalHeader().setStretchLastSection(True)
         self.track_table_widget.horizontalHeader().setSectionResizeMode(
             0, QHeaderView.ResizeMode.ResizeToContents
+        )
+        self.track_table_widget.horizontalHeader().setSectionResizeMode(
+            4, QHeaderView.ResizeMode.ResizeToContents
         )
         self.track_table_widget.verticalHeader().hide()
         self.track_table_widget.itemDoubleClicked.connect(self._on_track_double_clicked)
@@ -280,9 +286,20 @@ class MainWindow(QMainWindow):
         self.now_playing_label.setFixedWidth(200)
         layout.addWidget(self.now_playing_label)
 
-        self.play_btn = QPushButton("Play")
-        self.play_btn.setFixedWidth(60)
+        self.play_btn = QPushButton()
+        self.play_btn.setFixedSize(36, 36)
+        self.play_btn.setStyleSheet(
+            "QPushButton {"
+            "  background-color: #1A1A1A;"
+            "  border: 2px solid #444444;"
+            ""
+            "}"
+            "QPushButton:hover {"
+            "  background-color: #333333;"
+            "}"
+        )
         self.play_btn.clicked.connect(self._toggle_playback)
+        self._update_play_icon(False)
         layout.addWidget(self.play_btn)
 
         self.position_slider = QSlider(Qt.Orientation.Horizontal)
@@ -346,14 +363,22 @@ class MainWindow(QMainWindow):
         self.track_table_widget.setRowCount(len(tracks))
 
         for i, track in enumerate(tracks):
-            self.track_table_widget.setItem(i, 0, QTableWidgetItem(str(i + 1)))
+            num_item = QTableWidgetItem(str(i + 1))
+            num_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.track_table_widget.setItem(i, 0, num_item)
+
             self.track_table_widget.setItem(i, 1, QTableWidgetItem(track.title))
             self.track_table_widget.setItem(i, 2, QTableWidgetItem(track.artist))
+
+            dur_item = QTableWidgetItem(track.duration_formatted)
+            dur_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.track_table_widget.setItem(i, 3, dur_item)
+
             self.track_table_widget.setItem(
-                i, 3, QTableWidgetItem(track.duration_formatted)
+                i, 4, QTableWidgetItem(track.comments or "")
             )
 
-            for col in range(4):
+            for col in range(5):
                 item = self.track_table_widget.item(i, col)
                 if item:
                     item.setData(Qt.ItemDataRole.UserRole, track)
@@ -437,15 +462,38 @@ class MainWindow(QMainWindow):
         self.playback.load_track(track.file_path)
         self.playback.play()
         self.now_playing_label.setText(f"{track.title} - {track.artist}")
-        self.play_btn.setText("Pause")
+        QTimer.singleShot(100, self._sync_play_icon)
 
     def _toggle_playback(self):
         if self.playback.is_playing():
             self.playback.pause()
-            self.play_btn.setText("Play")
+            self._update_play_icon(False)
         elif self.current_track:
             self.playback.play()
-            self.play_btn.setText("Pause")
+            self._update_play_icon(True)
+
+    def _update_play_icon(self, is_playing: bool):
+        from PyQt6.QtGui import QPixmap, QIcon, QImage
+
+        style = self.play_btn.style()
+        if is_playing:
+            std_icon = QStyle.StandardPixmap.SP_MediaPause
+        else:
+            std_icon = QStyle.StandardPixmap.SP_MediaPlay
+
+        pixmap = style.standardIcon(std_icon).pixmap(24, 24)
+
+        img = pixmap.toImage()
+        for x in range(img.width()):
+            for y in range(img.height()):
+                pixel = img.pixel(x, y)
+                if pixel != 0:
+                    img.setPixel(x, y, 0xFFFFFFFF)
+
+        self.play_btn.setIcon(QIcon(QPixmap.fromImage(img)))
+
+    def _sync_play_icon(self):
+        self._update_play_icon(self.playback.is_playing())
 
     def _prev_track(self):
         if not self.all_tracks or not self.current_track:
@@ -523,9 +571,9 @@ class MainWindow(QMainWindow):
         from PyQt6.QtMultimedia import QMediaPlayer
 
         if state == QMediaPlayer.PlaybackState.PlayingState:
-            self.play_btn.setText("Pause")
+            self._update_play_icon(True)
         else:
-            self.play_btn.setText("Play")
+            self._update_play_icon(False)
 
     def _show_track_details(self, track: Track):
         self.current_track = track
@@ -565,6 +613,8 @@ class MainWindow(QMainWindow):
             pill = CategoryPill(cat)
             pill.remove_clicked.connect(lambda c: self._remove_category(c))
             self.categories_layout.addWidget(pill)
+
+        track.comments = " ".join(track.categories)
 
     def _update_suggestions(self, track: Track):
         while self.suggestions_layout.count():
@@ -615,7 +665,9 @@ class MainWindow(QMainWindow):
             item = self.track_table_widget.item(i, 0)
             stored = item.data(Qt.ItemDataRole.UserRole) if item else None
             if stored and stored.id == track.id:
-                for col in range(4):
+                comments = " ".join(track.categories)
+                self.track_table_widget.item(i, 4).setText(comments)
+                for col in range(5):
                     item = self.track_table_widget.item(i, col)
                     if item:
                         item.setData(Qt.ItemDataRole.UserRole, track)

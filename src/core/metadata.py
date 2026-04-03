@@ -117,6 +117,42 @@ def read_comment(file_path: str) -> list[str]:
         return []
 
 
+def read_comment_raw(file_path: str) -> str:
+    path = Path(file_path)
+    if not path.exists():
+        return ""
+
+    try:
+        audio = mutagen.File(file_path)
+        if audio is None:
+            return ""
+
+        if not hasattr(audio, "tags") or audio.tags is None:
+            return ""
+
+        if isinstance(audio, MP3):
+            if hasattr(audio.tags, "getall"):
+                comm_all = list(audio.tags.getall("COMM"))
+                if comm_all:
+                    text = comm_all[0].text
+                    if isinstance(text, list) and text:
+                        text = text[0]
+                    if text:
+                        return text
+        else:
+            comment = audio.tags.get("COMMENT")
+            if comment:
+                text = comment[0] if isinstance(comment, list) else comment
+                if isinstance(text, list) and text:
+                    text = text[0]
+                if text:
+                    return text
+
+        return ""
+    except Exception:
+        return ""
+
+
 def write_comment(file_path: str, categories: list[str]) -> bool:
     path = Path(file_path)
     if not path.exists():
@@ -144,6 +180,38 @@ def write_comment(file_path: str, categories: list[str]) -> bool:
             )
         elif isinstance(audio, FLAC):
             audio.tags["COMMENT"] = [comment_text]
+
+        audio.save()
+        return True
+    except Exception:
+        return False
+
+
+def write_comments(file_path: str, comments: str) -> bool:
+    path = Path(file_path)
+    if not path.exists():
+        return False
+
+    try:
+        audio = mutagen.File(file_path)
+        if audio is None:
+            return False
+
+        if isinstance(audio, MP3):
+            if audio.tags is None:
+                audio.add_tags()
+            audio.tags.setall(
+                "COMM",
+                [
+                    mutagen.id3.COMM(
+                        encoding=3,
+                        lang="eng",
+                        text=comments,
+                    )
+                ],
+            )
+        elif isinstance(audio, FLAC):
+            audio.tags["COMMENT"] = [comments]
 
         audio.save()
         return True
