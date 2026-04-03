@@ -1,4 +1,5 @@
 """Tests for Mp3Parser methods."""
+
 import pytest
 from unittest.mock import patch, MagicMock
 import mutagen
@@ -61,7 +62,9 @@ class TestReadMetadata:
         result = parser.read_metadata("/nonexistent/file.mp3")
         assert result == {}
 
-    def test_mutagen_returns_none_returns_empty(self, parser: Mp3Parser, tmp_path) -> None:
+    def test_mutagen_returns_none_returns_empty(
+        self, parser: Mp3Parser, tmp_path
+    ) -> None:
         fake = tmp_path / "test.mp3"
         fake.write_bytes(b"")
         with patch("mutagen.File", return_value=None):
@@ -114,7 +117,9 @@ class TestReadComment:
         result = parser.read_comment("/nonexistent/file.mp3")
         assert result == []
 
-    def test_mutagen_returns_none_returns_empty_list(self, parser: Mp3Parser, tmp_path) -> None:
+    def test_mutagen_returns_none_returns_empty_list(
+        self, parser: Mp3Parser, tmp_path
+    ) -> None:
         fake = tmp_path / "test.mp3"
         fake.write_bytes(b"")
         with patch("mutagen.File", return_value=None):
@@ -138,7 +143,9 @@ class TestReadComment:
             result = parser.read_comment(str(fake))
         assert result == ["rock", "pop", "90s"]
 
-    def test_empty_comm_tag_returns_empty_list(self, parser: Mp3Parser, tmp_path) -> None:
+    def test_empty_comm_tag_returns_empty_list(
+        self, parser: Mp3Parser, tmp_path
+    ) -> None:
         fake = tmp_path / "test.mp3"
         fake.write_bytes(b"")
         audio = _make_mp3_audio(comm_text="")
@@ -152,7 +159,9 @@ class TestReadCommentRaw:
         result = parser.read_comment_raw("/nonexistent/file.mp3")
         assert result == ""
 
-    def test_mutagen_returns_none_returns_empty_string(self, parser: Mp3Parser, tmp_path) -> None:
+    def test_mutagen_returns_none_returns_empty_string(
+        self, parser: Mp3Parser, tmp_path
+    ) -> None:
         fake = tmp_path / "test.mp3"
         fake.write_bytes(b"")
         with patch("mutagen.File", return_value=None):
@@ -167,7 +176,9 @@ class TestReadCommentRaw:
             result = parser.read_comment_raw(str(fake))
         assert result == "rock pop 90s"
 
-    def test_no_comm_tag_returns_empty_string(self, parser: Mp3Parser, tmp_path) -> None:
+    def test_no_comm_tag_returns_empty_string(
+        self, parser: Mp3Parser, tmp_path
+    ) -> None:
         fake = tmp_path / "test.mp3"
         fake.write_bytes(b"")
         audio = _make_mp3_audio(comm_text="")
@@ -181,7 +192,9 @@ class TestWriteComment:
         result = parser.write_comment("/nonexistent/file.mp3", ["rock"])
         assert result is False
 
-    def test_mutagen_returns_none_returns_false(self, parser: Mp3Parser, tmp_path) -> None:
+    def test_mutagen_returns_none_returns_false(
+        self, parser: Mp3Parser, tmp_path
+    ) -> None:
         fake = tmp_path / "test.mp3"
         fake.write_bytes(b"")
         with patch("mutagen.File", return_value=None):
@@ -241,7 +254,9 @@ class TestWriteComments:
 
 
 class TestGetAlbumArt:
-    def test_mutagen_returns_none_returns_none(self, parser: Mp3Parser, tmp_path) -> None:
+    def test_mutagen_returns_none_returns_none(
+        self, parser: Mp3Parser, tmp_path
+    ) -> None:
         fake = tmp_path / "test.mp3"
         fake.write_bytes(b"")
         with patch("mutagen.File", return_value=None):

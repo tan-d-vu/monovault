@@ -1,4 +1,5 @@
 """Category management — add/remove categories, delegate suggestions to sources."""
+
 import logging
 from typing import Optional
 from ..models.track import Track

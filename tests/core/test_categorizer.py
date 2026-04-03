@@ -1,5 +1,5 @@
 """Tests for Categorizer with pluggable sources."""
-import pytest
+
 from unittest.mock import MagicMock, patch
 from src.core.categorizer import Categorizer
 from src.models.track import Track
@@ -23,9 +23,15 @@ class TestCategorizerGetSuggestions:
     def test_delegates_to_sources_and_deduplicates(self):
         library = MagicMock()
         source1 = MagicMock()
-        source1.get_suggestions.return_value = [("rock", "same artist"), ("jazz", "same artist")]
+        source1.get_suggestions.return_value = [
+            ("rock", "same artist"),
+            ("jazz", "same artist"),
+        ]
         source2 = MagicMock()
-        source2.get_suggestions.return_value = [("rock", "similar category"), ("blues", "similar category")]
+        source2.get_suggestions.return_value = [
+            ("rock", "similar category"),
+            ("blues", "similar category"),
+        ]
         categorizer = Categorizer(library, sources=[source1, source2])
         track = make_track()
         result = categorizer.get_suggestions(track, max_suggestions=5)
@@ -45,7 +51,12 @@ class TestCategorizerGetSuggestions:
         library = MagicMock()
         source = MagicMock()
         source.get_suggestions.return_value = [
-            ("a", "x"), ("b", "x"), ("c", "x"), ("d", "x"), ("e", "x"), ("f", "x")
+            ("a", "x"),
+            ("b", "x"),
+            ("c", "x"),
+            ("d", "x"),
+            ("e", "x"),
+            ("f", "x"),
         ]
         categorizer = Categorizer(library, sources=[source])
         result = categorizer.get_suggestions(make_track(), max_suggestions=3)
@@ -63,7 +74,9 @@ class TestCategorizerAddCategory:
         library = MagicMock()
         categorizer = Categorizer(library)
         track = make_track(categories=["rock"])
-        with patch("src.core.categorizer.write_comment", return_value=True) as mock_write:
+        with patch(
+            "src.core.categorizer.write_comment", return_value=True
+        ) as mock_write:
             result = categorizer.add_category(track, "jazz")
         assert result is True
         assert "jazz" in track.categories
@@ -102,7 +115,9 @@ class TestCategorizerRemoveCategory:
         library = MagicMock()
         categorizer = Categorizer(library)
         track = make_track(categories=["rock", "jazz"])
-        with patch("src.core.categorizer.write_comment", return_value=True) as mock_write:
+        with patch(
+            "src.core.categorizer.write_comment", return_value=True
+        ) as mock_write:
             result = categorizer.remove_category(track, "rock")
         assert result is True
         assert "rock" not in track.categories

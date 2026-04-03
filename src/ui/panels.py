@@ -7,24 +7,82 @@ from PyQt6.QtWidgets import (
     QTreeWidget,
     QTreeWidgetItem,
     QTableWidget,
-    QTableWidgetItem,
     QLineEdit,
     QLabel,
     QPushButton,
     QSlider,
     QFrame,
     QHeaderView,
-    QAbstractItemView,
     QScrollArea,
     QSizePolicy,
     QStyle,
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFontMetrics, QIcon, QPixmap, QImage
+from enum import IntEnum
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .track_table import TrackTableManager
 
 from .styles import THEME
 from .widgets import CategoryPill, SuggestionButton
 from ..models.track import Track
+
+
+class TrackTableColumn(IntEnum):
+    NUMBER = 0
+    TITLE = 1
+    ARTIST = 2
+    DURATION = 3
+    COMMENTS = 4
+    LOCATION = 5
+    DATE_ADDED = 6
+    COUNT = 7
+
+
+_COLUMN_LABELS = [
+    "#",
+    "Title",
+    "Artist",
+    "Duration",
+    "Comments",
+    "Location",
+    "Date Added",
+]
+
+_COLUMN_RESIZE_MODES: dict[TrackTableColumn, QHeaderView.ResizeMode] = {
+    TrackTableColumn.NUMBER: QHeaderView.ResizeMode.ResizeToContents,
+    TrackTableColumn.TITLE: QHeaderView.ResizeMode.ResizeToContents,
+    TrackTableColumn.ARTIST: QHeaderView.ResizeMode.ResizeToContents,
+    TrackTableColumn.DURATION: QHeaderView.ResizeMode.ResizeToContents,
+    TrackTableColumn.COMMENTS: QHeaderView.ResizeMode.Stretch,
+    TrackTableColumn.LOCATION: QHeaderView.ResizeMode.Fixed,
+    TrackTableColumn.DATE_ADDED: QHeaderView.ResizeMode.Interactive,
+}
+
+
+def create_track_table() -> tuple[
+    QWidget, QLineEdit, QTableWidget, "TrackTableManager"
+]:
+    panel = QFrame()
+    panel.setFrameStyle(QFrame.Shape.NoFrame)
+
+    layout = QVBoxLayout(panel)
+    layout.setContentsMargins(8, 8, 8, 8)
+    layout.setSpacing(8)
+
+    search_input = QLineEdit()
+    search_input.setPlaceholderText("Search tracks...")
+    layout.addWidget(search_input)
+
+    track_table_widget = QTableWidget()
+    from .track_table import TrackTableManager
+
+    track_table_manager = TrackTableManager(track_table_widget)
+    layout.addWidget(track_table_widget)
+
+    return panel, search_input, track_table_widget, track_table_manager
 
 
 def create_folder_panel() -> tuple[QWidget, QTreeWidget, QPushButton, QPushButton]:
@@ -59,49 +117,6 @@ def create_folder_panel() -> tuple[QWidget, QTreeWidget, QPushButton, QPushButto
     layout.addLayout(button_layout)
 
     return panel, folder_tree_widget, add_folder_btn, refresh_btn
-
-
-def create_track_table() -> tuple[QWidget, QLineEdit, QTableWidget]:
-    panel = QFrame()
-    panel.setFrameStyle(QFrame.Shape.NoFrame)
-
-    layout = QVBoxLayout(panel)
-    layout.setContentsMargins(8, 8, 8, 8)
-    layout.setSpacing(8)
-
-    search_input = QLineEdit()
-    search_input.setPlaceholderText("Search tracks...")
-    layout.addWidget(search_input)
-
-    track_table_widget = QTableWidget()
-    track_table_widget.setColumnCount(7)
-    track_table_widget.setHorizontalHeaderLabels(
-        ["#", "Title", "Artist", "Duration", "Comments", "Location", "Date Added"]
-    )
-    track_table_widget.setSelectionBehavior(
-        QAbstractItemView.SelectionBehavior.SelectRows
-    )
-    track_table_widget.setSelectionMode(
-        QAbstractItemView.SelectionMode.ExtendedSelection
-    )
-    track_table_widget.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-    track_table_widget.setAlternatingRowColors(True)
-    track_table_widget.setSortingEnabled(True)
-    track_table_widget.horizontalHeader().setStretchLastSection(False)
-
-    header = track_table_widget.horizontalHeader()
-    header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-    header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
-    header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
-    header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
-    header.setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
-    header.setSectionResizeMode(5, QHeaderView.ResizeMode.Fixed)
-    header.setSectionResizeMode(6, QHeaderView.ResizeMode.Interactive)
-
-    track_table_widget.verticalHeader().hide()
-    layout.addWidget(track_table_widget)
-
-    return panel, search_input, track_table_widget
 
 
 def create_details_panel() -> tuple[
@@ -355,52 +370,6 @@ def update_suggestions(
             btn = SuggestionButton(cat, source)
             btn.clicked_with_source.connect(on_click)
             suggestions_layout.addWidget(btn)
-
-
-def populate_track_table(table: QTableWidget, tracks: list[Track]) -> None:
-    table.setRowCount(len(tracks))
-
-    for i, track in enumerate(tracks):
-        num_item = QTableWidgetItem(str(i + 1))
-        num_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-        table.setItem(i, 0, num_item)
-
-        table.setItem(i, 1, QTableWidgetItem(track.title))
-        table.setItem(i, 2, QTableWidgetItem(track.artist))
-
-        dur_item = QTableWidgetItem(track.duration_formatted)
-        dur_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-        table.setItem(i, 3, dur_item)
-
-        table.setItem(i, 4, QTableWidgetItem(track.comments or ""))
-
-        table.setItem(i, 5, QTableWidgetItem(track.location))
-
-        added_item = QTableWidgetItem(track.date_added or "")
-        added_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-        added_item.setData(
-            Qt.ItemDataRole.TextAlignmentRole,
-            int(Qt.AlignmentFlag.AlignCenter) | int(Qt.AlignmentFlag.AlignVCenter),
-        )
-        table.setItem(i, 6, added_item)
-
-        for col in range(7):
-            item = table.item(i, col)
-            if item:
-                item.setData(Qt.ItemDataRole.UserRole, track)
-
-    for col in range(7):
-        if col == 4:
-            continue
-        max_width = 0
-        for i in range(len(tracks)):
-            item = table.item(i, col)
-            if item:
-                width = table.fontMetrics().boundingRect(item.text()).width()
-                max_width = max(max_width, width)
-        if max_width > 0:
-            padding = 30 if col in (5, 6) else 4
-            table.setColumnWidth(col, max_width + padding)
 
 
 def populate_folder_tree(tree: QTreeWidget, folders: list[str]) -> None:

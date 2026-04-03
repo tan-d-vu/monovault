@@ -1,4 +1,5 @@
 """Metadata package — backward-compatible API."""
+
 from typing import Optional
 from .registry import create_default_registry
 

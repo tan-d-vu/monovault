@@ -1,4 +1,5 @@
 """Tests for FlacParser methods."""
+
 import pytest
 from unittest.mock import patch, MagicMock
 import mutagen
@@ -65,7 +66,9 @@ class TestReadMetadata:
         result = parser.read_metadata("/nonexistent/file.flac")
         assert result == {}
 
-    def test_mutagen_returns_none_returns_empty(self, parser: FlacParser, tmp_path) -> None:
+    def test_mutagen_returns_none_returns_empty(
+        self, parser: FlacParser, tmp_path
+    ) -> None:
         fake = tmp_path / "test.flac"
         fake.write_bytes(b"")
         with patch("mutagen.File", return_value=None):
@@ -82,7 +85,9 @@ class TestReadMetadata:
     def test_flac_tags_extracted_correctly(self, parser: FlacParser, tmp_path) -> None:
         fake = tmp_path / "test.flac"
         fake.write_bytes(b"")
-        audio = _make_flac_audio(title="Song", artist="Band", album="LP", duration=240.0)
+        audio = _make_flac_audio(
+            title="Song", artist="Band", album="LP", duration=240.0
+        )
         with patch("mutagen.File", return_value=audio):
             result = parser.read_metadata(str(fake))
         assert result["title"] == "Song"
@@ -114,7 +119,9 @@ class TestReadComment:
         result = parser.read_comment("/nonexistent/file.flac")
         assert result == []
 
-    def test_mutagen_returns_none_returns_empty_list(self, parser: FlacParser, tmp_path) -> None:
+    def test_mutagen_returns_none_returns_empty_list(
+        self, parser: FlacParser, tmp_path
+    ) -> None:
         fake = tmp_path / "test.flac"
         fake.write_bytes(b"")
         with patch("mutagen.File", return_value=None):
@@ -138,7 +145,9 @@ class TestReadComment:
             result = parser.read_comment(str(fake))
         assert result == ["jazz", "blues", "70s"]
 
-    def test_empty_comment_returns_empty_list(self, parser: FlacParser, tmp_path) -> None:
+    def test_empty_comment_returns_empty_list(
+        self, parser: FlacParser, tmp_path
+    ) -> None:
         fake = tmp_path / "test.flac"
         fake.write_bytes(b"")
         audio = _make_flac_audio(comment="")
@@ -152,7 +161,9 @@ class TestReadCommentRaw:
         result = parser.read_comment_raw("/nonexistent/file.flac")
         assert result == ""
 
-    def test_mutagen_returns_none_returns_empty_string(self, parser: FlacParser, tmp_path) -> None:
+    def test_mutagen_returns_none_returns_empty_string(
+        self, parser: FlacParser, tmp_path
+    ) -> None:
         fake = tmp_path / "test.flac"
         fake.write_bytes(b"")
         with patch("mutagen.File", return_value=None):
@@ -167,7 +178,9 @@ class TestReadCommentRaw:
             result = parser.read_comment_raw(str(fake))
         assert result == "jazz blues 70s"
 
-    def test_no_comment_returns_empty_string(self, parser: FlacParser, tmp_path) -> None:
+    def test_no_comment_returns_empty_string(
+        self, parser: FlacParser, tmp_path
+    ) -> None:
         fake = tmp_path / "test.flac"
         fake.write_bytes(b"")
         audio = _make_flac_audio(comment="")
@@ -181,7 +194,9 @@ class TestWriteComment:
         result = parser.write_comment("/nonexistent/file.flac", ["jazz"])
         assert result is False
 
-    def test_mutagen_returns_none_returns_false(self, parser: FlacParser, tmp_path) -> None:
+    def test_mutagen_returns_none_returns_false(
+        self, parser: FlacParser, tmp_path
+    ) -> None:
         fake = tmp_path / "test.flac"
         fake.write_bytes(b"")
         with patch("mutagen.File", return_value=None):
@@ -241,7 +256,9 @@ class TestWriteComments:
 
 
 class TestGetAlbumArt:
-    def test_mutagen_returns_none_returns_none(self, parser: FlacParser, tmp_path) -> None:
+    def test_mutagen_returns_none_returns_none(
+        self, parser: FlacParser, tmp_path
+    ) -> None:
         fake = tmp_path / "test.flac"
         fake.write_bytes(b"")
         with patch("mutagen.File", return_value=None):

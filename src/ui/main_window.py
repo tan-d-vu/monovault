@@ -26,7 +26,6 @@ from .panels import (
     update_track_details_ui,
     update_categories,
     update_suggestions,
-    populate_track_table,
     populate_folder_tree,
     get_folder_width,
 )
@@ -90,9 +89,12 @@ class MainWindow(QMainWindow):
             self.add_folder_btn,
             self.refresh_btn,
         ) = create_folder_panel()
-        self.track_table_panel, self.search_input, self.track_table_widget = (
-            create_track_table()
-        )
+        (
+            self.track_table_panel,
+            self.search_input,
+            self.track_table_widget,
+            self.track_table_manager,
+        ) = create_track_table()
         (
             self.details_panel,
             self.album_art_label,
@@ -190,7 +192,7 @@ class MainWindow(QMainWindow):
     def _load_tracks(self):
         self.all_tracks = self.library.get_all_tracks()
         self.playback_ctrl.set_track_list(self.all_tracks)
-        populate_track_table(self.track_table_widget, self.all_tracks)
+        self.track_table_manager.populate(self.all_tracks)
         if self.all_tracks:
             self.track_table_widget.selectRow(0)
 
@@ -260,7 +262,7 @@ class MainWindow(QMainWindow):
 
     def _on_search_results(self, tracks: list[Track]) -> None:
         self.all_tracks = tracks
-        populate_track_table(self.track_table_widget, self.all_tracks)
+        self.track_table_manager.populate(self.all_tracks)
         self.playback_ctrl.set_track_list(self.all_tracks)
 
     def _on_track_double_clicked(self, item, column=None):
@@ -277,7 +279,7 @@ class MainWindow(QMainWindow):
             if track:
                 self.category_ctrl.select_track(track)
                 # Set the track in playback controller so play button works for default selected track on app start
-                if self.playback_ctrl.current_track == None:
+                if self.playback_ctrl.current_track is None:
                     self.now_playing_label.setText(
                         "{} - {}".format(track.title, track.artist)
                     )
@@ -362,5 +364,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-

@@ -1,4 +1,5 @@
 """MP3 metadata parser using ID3 tags."""
+
 import logging
 from pathlib import Path
 from typing import Optional

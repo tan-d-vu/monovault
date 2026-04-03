@@ -1,6 +1,5 @@
 import pytest
-from unittest.mock import MagicMock, patch
-from PyQt6.QtCore import QObject
+from unittest.mock import MagicMock
 
 from src.ui.controllers.playback_controller import PlaybackController
 from src.models.track import Track

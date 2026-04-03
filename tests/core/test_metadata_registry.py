@@ -1,4 +1,5 @@
 """Tests for MetadataRegistry dispatch logic."""
+
 import pytest
 from unittest.mock import MagicMock
 from src.core.metadata.registry import MetadataRegistry

@@ -1,4 +1,5 @@
 """Base class with shared validation and logging for metadata parsers."""
+
 import logging
 from pathlib import Path
 from typing import Optional

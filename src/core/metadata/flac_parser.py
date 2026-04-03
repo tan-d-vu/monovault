@@ -1,4 +1,5 @@
 """FLAC metadata parser using Vorbis comment tags."""
+
 import logging
 from pathlib import Path
 from typing import Optional
@@ -96,9 +97,7 @@ class FlacParser(BaseParser):
                         if all_pics_flac:
                             metadata["album_art"] = all_pics_flac[0].data
                     except (AttributeError, IndexError) as e:
-                        logger.error(
-                            "Error reading album art for %s: %s", file_path, e
-                        )
+                        logger.error("Error reading album art for %s: %s", file_path, e)
 
             if audio.info:
                 metadata["duration"] = getattr(audio.info, "length", 0.0)
@@ -130,9 +129,7 @@ class FlacParser(BaseParser):
                     if text:
                         return text.split()
                 except (IndexError, TypeError, AttributeError) as e:
-                    logger.error(
-                        "Error parsing COMMENT tag for %s: %s", file_path, e
-                    )
+                    logger.error("Error parsing COMMENT tag for %s: %s", file_path, e)
                 return []
 
             return []

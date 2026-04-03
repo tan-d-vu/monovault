@@ -12,8 +12,7 @@ class TestSearchController:
         repo.search.return_value = ["track1"]
 
         ctrl = SearchController(repo, debounce_ms=0)
-
-        results = ctrl.search_immediate("test")
+        ctrl.search_immediate("test")
         repo.search.assert_called_once_with("test")
 
     def test_search_immediate_empty_returns_all(self, qapp):
@@ -21,8 +20,7 @@ class TestSearchController:
         repo.get_all_tracks.return_value = ["all"]
 
         ctrl = SearchController(repo, debounce_ms=0)
-
-        results = ctrl.search_immediate("")
+        ctrl.search_immediate("")
         repo.get_all_tracks.assert_called_once()
 
     def test_search_strips_whitespace(self, qapp):

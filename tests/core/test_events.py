@@ -3,8 +3,6 @@ from src.core.events import (
     EventBus,
     TrackPlaybackStarted,
     PlaybackStateChanged,
-    CategoriesChanged,
-    Event,
 )
 from src.models.track import Track
 
@@ -18,18 +16,19 @@ def bus():
 def track():
     return Track(
         id=1,
-        file_path="/tmp/t.mp3",
-        title="T",
-        artist="A",
-        album="B",
-        duration=60.0,
+        file_path="/test/path.mp3",
+        title="Test Track",
+        artist="Test Artist",
+        album="Test Album",
+        duration=180.0,
         categories=[],
         album_art=None,
-        folder_path="/tmp",
+        folder_path="/test",
+        comments="",
+        date_added="",
     )
 
 
-@pytest.mark.unit
 class TestEventBus:
     def test_publish_calls_subscriber(self, bus, track):
         received = []
@@ -53,7 +52,10 @@ class TestEventBus:
 
     def test_unsubscribe(self, bus, track):
         received = []
-        handler = lambda e: received.append(e)
+
+        def handler(e):
+            received.append(e)
+
         bus.subscribe(TrackPlaybackStarted, handler)
         bus.unsubscribe(TrackPlaybackStarted, handler)
         bus.publish(TrackPlaybackStarted(track=track))
@@ -62,16 +64,18 @@ class TestEventBus:
     def test_handler_exception_does_not_break_others(self, bus, track):
         results = []
 
-        def bad_handler(e):
-            raise RuntimeError("oops")
+        def failing_handler(e):
+            raise RuntimeError("Handler failed")
 
-        def good_handler(e):
+        def working_handler(e):
             results.append(e)
 
-        bus.subscribe(TrackPlaybackStarted, bad_handler)
-        bus.subscribe(TrackPlaybackStarted, good_handler)
+        bus.subscribe(TrackPlaybackStarted, failing_handler)
+        bus.subscribe(TrackPlaybackStarted, working_handler)
         bus.publish(TrackPlaybackStarted(track=track))
         assert len(results) == 1
+        assert isinstance(results[0], TrackPlaybackStarted)
+        assert results[0].track is track
 
     def test_clear(self, bus, track):
         bus.subscribe(TrackPlaybackStarted, lambda e: None)

@@ -1,4 +1,5 @@
 """Format registry that dispatches to the correct parser by file extension."""
+
 import logging
 from pathlib import Path
 from typing import Optional
