@@ -30,6 +30,7 @@ class CategoryController(QObject):
     def select_track(self, track: Track) -> None:
         self._current_track = track
         self.track_details_changed.emit(track)
+        self.categories_changed.emit(track)
         self._refresh_suggestions()
 
     def add_category(self, category: str) -> bool:
