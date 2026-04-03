@@ -1,4 +1,7 @@
+"""In-memory track store. Implements ITrackRepository."""
+
 from typing import Optional
+
 from ..models.track import Track
 from .config import Config
 
@@ -38,7 +41,7 @@ class LibraryManager:
         self.next_id += 1
         return track.id
 
-    def update_track(self, track: Track):
+    def update_track(self, track: Track) -> None:
         if track.id in self.tracks:
             self.tracks[track.id] = track
 
