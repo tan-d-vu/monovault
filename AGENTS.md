@@ -21,7 +21,9 @@ monovault/
 │   ├── models/              # Data models
 │   │   └── track.py         # Track dataclass
 │   ├── core/                # Business logic
+│   │   ├── config.py        # JSON config for folders
 │   │   ├── library.py       # In-memory library manager
+│   │   ├── library_store.py # File mtime cache for change detection
 │   │   ├── metadata.py      # Audio metadata read/write
 │   │   ├── scanner.py       # Library folder scanner
 │   │   ├── playback.py      # Audio playback engine
@@ -89,7 +91,7 @@ pyinstaller --onefile --windowed src/ui/main_window.py
 - **Reason**: COMM for MP3, COMMENT for FLAC - user-editable in other apps
 - **Format**: Space-separated words (e.g., "rock favorite workout")
 
-### 5. Category suggestion algorithm
+### 6. Category suggestion algorithm
 - **Source 1**: Categories from tracks with same artist
 - **Source 2**: Categories from tracks sharing any category
 - **Limit**: Max 5 suggestions
@@ -118,6 +120,12 @@ pyinstaller --onefile --windowed src/ui/main_window.py
 - `add_folder(path)` - Add folder to config
 - `remove_folder(path)` - Remove folder from config
 - `get_folders()` - Get saved folders
+
+### library_store.py
+- JSON cache file at `~/.monovault/library.json`
+- `record_if_new(file_path)` - Record file addition date
+- `get(file_path)` - Get stored addition date for file
+- Tracks when files were added to the library
 
 ### metadata.py
 - `read_metadata(path)` - Extract title, artist, album, duration, art

@@ -32,7 +32,7 @@ The venv is at `./venv`. Activate with `source venv/bin/activate` (Linux/Mac) or
 ```
 Files (MP3/FLAC)
   └─ Scanner → Track objects → LibraryManager (in-memory dict)
-                                     └─ Categorizer → writes back to file via metadata.write_comment()
+                                      └─ Categorizer → writes back to file via metadata.write_comment()
 ```
 
 The **library is purely in-memory**; files are the source of truth. On every launch, folders are re-scanned from the list persisted in `~/.monovault/config.json`. Categories are read from and written directly to the audio file's COMMENT/COMM metadata tag as a space-separated string (e.g. `"rock instrumental 90s"`).
@@ -44,6 +44,7 @@ The **library is purely in-memory**; files are the source of truth. On every lau
 | `src/models/track.py` | `Track` dataclass — central data object passed everywhere |
 | `src/core/config.py` | Persists folder list to `~/.monovault/config.json` |
 | `src/core/library.py` | In-memory `dict[int, Track]` store; search; tracks by artist/category |
+| `src/core/library_store.py` | Persists track addition dates to `~/.monovault/library.json` |
 | `src/core/scanner.py` | Recursively scans folders for MP3/FLAC, returns `Track` objects |
 | `src/core/metadata.py` | Reads ID3/Vorbis tags via `mutagen`; `write_comment()` saves categories |
 | `src/core/categorizer.py` | Add/remove/suggest categories; calls `write_comment` then updates library |
@@ -61,3 +62,8 @@ Three-panel `QSplitter` (folder tree | track table | details) above a fixed play
 1. Collect categories from other tracks by same artist
 2. Collect categories from tracks sharing any category with the current track
 3. Deduplicate, exclude already-applied categories, limit to 5
+
+### Config files
+
+- `~/.monovault/config.json` — stores added folders as `{"folders": ["/path", ...]}`
+- `~/.monovault/library.json` — caches file modification times for change detection

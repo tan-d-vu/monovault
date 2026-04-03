@@ -195,7 +195,12 @@
    - `scan_library()` - Rescan all folders
    - `get_tracks(filters: dict)` - Get filtered tracks
 
-2. **MetadataReader**
+2. **LibraryStore**
+   - `record_if_new(file_path: str)` - Record file addition date
+   - `get(file_path: str)` - Get stored addition date for file
+   - Tracks when files were added to the library
+
+3. **MetadataReader**
    - `read_metadata(file_path: str)` - Read audio file metadata
    - `write_metadata(file_path: str, data: dict)` - Write metadata
    - `extract_album_art(file_path: str)` - Extract embedded art

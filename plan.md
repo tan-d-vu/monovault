@@ -3,15 +3,16 @@
 ## Requirements Summary
 
 ### Technology Stack
-- **Language**: Python (faster development)
-- **Framework**: PyQt (rich UI capabilities)
+- **Language**: Python 3.10+
+- **Framework**: PyQt6 (rich UI capabilities)
 - **Packaging**: PyInstaller (single .exe on Windows)
-- **Storage**: In-memory (no database)
+- **Storage**: In-memory (no database), with mtime cache for change detection
 - **UI Language**: English
 
 ### Supported Platforms
 - Windows (.exe via PyInstaller)
 - MacOS (via PyInstaller or similar)
+- Linux (direct execution)
 
 ### Core Features
 
@@ -20,12 +21,15 @@
 - Support audio formats: MP3, FLAC
 - In-memory storage for performance (2000+ tracks ~700KB)
 - Album art extraction and display
+- Track addition dates stored in `~/.monovault/library.json`
+- Folder persistence in `~/.monovault/config.json`
 
 #### 2. Audio Playback
 - Play/pause/stop
 - Volume control
 - Seek functionality
 - Basic track info (name, artist, length)
+- Previous/next track navigation
 
 #### 3. Categorization System
 - Categories stored in metadata tag (COMM for MP3, COMMENT for FLAC)
@@ -46,14 +50,14 @@
 
 #### 6. Search
 - Search by: categories, track name, album, artist
-- Debounced search (~1-2 second delay without enter)
+- Debounced search (1.5 second delay without enter)
 
 #### 7. UI Layout
-- Configurable: tree view or flat list
-- 2-3 panel layout (library + playback + details)
+- Three-panel layout (folder tree | track table | details)
 - Album art display
+- Dark theme
 
 ## Out of Scope (for now)
-- Metadata change detection while app is running
+- Real-time metadata change detection (manual refresh only)
 - Playlists
 - Export to CSV
