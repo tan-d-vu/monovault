@@ -3,6 +3,7 @@
 from typing import Optional
 from PyQt6.QtCore import QObject, pyqtSignal
 
+from ...core.events import EventBus
 from ...core.playback import PlaybackEngine
 from ...models.track import Track
 
@@ -17,10 +18,14 @@ class PlaybackController(QObject):
     slider_position_changed = pyqtSignal(int)
 
     def __init__(
-        self, engine: PlaybackEngine, parent: Optional[QObject] = None
+        self,
+        engine: PlaybackEngine,
+        bus: Optional[EventBus] = None,
+        parent: Optional[QObject] = None,
     ) -> None:
         super().__init__(parent)
         self._engine = engine
+        self._bus = bus
         self._current_track: Optional[Track] = None
         self._track_list: list[Track] = []
         self._is_seeking = False
@@ -45,14 +50,26 @@ class PlaybackController(QObject):
         self._engine.load_track(track.file_path)
         self._engine.play()
         self.now_playing_changed.emit(f"{track.title} - {track.artist}")
+        if self._bus:
+            from ...core.events import TrackPlaybackStarted
+
+            self._bus.publish(TrackPlaybackStarted(track=track))
 
     def toggle_playback(self) -> None:
         if self._engine.is_playing():
             self._engine.pause()
             self.play_state_changed.emit(False)
+            if self._bus:
+                from ...core.events import PlaybackStateChanged
+
+                self._bus.publish(PlaybackStateChanged(is_playing=False))
         elif self._current_track:
             self._engine.play()
             self.play_state_changed.emit(True)
+            if self._bus:
+                from ...core.events import PlaybackStateChanged
+
+                self._bus.publish(PlaybackStateChanged(is_playing=True))
 
     def seek(self, slider_position: int) -> None:
         if self._is_seeking:
@@ -86,6 +103,10 @@ class PlaybackController(QObject):
     def stop(self) -> None:
         self._engine.stop()
         self._current_track = None
+        if self._bus:
+            from ...core.events import PlaybackStopped
+
+            self._bus.publish(PlaybackStopped())
 
     def _find_current_index(self) -> Optional[int]:
         if not self._current_track:

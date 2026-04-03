@@ -312,7 +312,9 @@ def update_track_details_ui(
         album_art_label.clear()
 
 
-def update_categories(track: Track, categories_layout: QVBoxLayout) -> None:
+def update_categories(
+    track: Track, categories_layout: QVBoxLayout, on_remove=None
+) -> None:
     while categories_layout.count():
         child = categories_layout.takeAt(0)
         if child.widget():
@@ -320,6 +322,8 @@ def update_categories(track: Track, categories_layout: QVBoxLayout) -> None:
 
     for cat in track.categories:
         pill = CategoryPill(cat)
+        if on_remove:
+            pill.remove_clicked.connect(on_remove)
         categories_layout.addWidget(pill)
 
     track.comments = " ".join(track.categories)

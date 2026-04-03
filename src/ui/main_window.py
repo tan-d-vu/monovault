@@ -33,6 +33,7 @@ from ..core.scanner import Scanner
 from ..core.playback import PlaybackEngine
 from ..core.categorizer import Categorizer
 from ..core.category_sources import ArtistCategorySource, SimilarCategoryCategorySource
+from ..core.events import EventBus
 from ..models.track import Track
 from .controllers import PlaybackController, SearchController, CategoryController
 
@@ -40,6 +41,7 @@ from .controllers import PlaybackController, SearchController, CategoryControlle
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+        self._bus = EventBus()
         self.library = LibraryManager()
         self.library_store = LibraryStore()
         self.scanner = Scanner(library_store=self.library_store)
@@ -53,14 +55,19 @@ class MainWindow(QMainWindow):
             ],
         )
 
-        self.playback_ctrl = PlaybackController(self.playback_engine, parent=self)
-        self.search_ctrl = SearchController(self.library, parent=self)
-        self.category_ctrl = CategoryController(self.categorizer, parent=self)
+        self.playback_ctrl = PlaybackController(
+            self.playback_engine, bus=self._bus, parent=self
+        )
+        self.search_ctrl = SearchController(self.library, bus=self._bus, parent=self)
+        self.category_ctrl = CategoryController(
+            self.categorizer, bus=self._bus, parent=self
+        )
 
         self.all_tracks: list[Track] = []
 
         self._setup_ui()
         self._connect_controllers()
+        self._subscribe_events()
         self._load_library()
 
     def _setup_ui(self):
@@ -154,6 +161,14 @@ class MainWindow(QMainWindow):
         self.category_ctrl.categories_changed.connect(self._on_categories_changed)
         self.category_ctrl.suggestions_changed.connect(self._on_suggestions_changed)
         self.category_ctrl.track_details_changed.connect(self._on_track_details_changed)
+
+    def _subscribe_events(self):
+        from ..core.events import CategoriesChanged
+
+        self._bus.subscribe(CategoriesChanged, self._on_categories_event)
+
+    def _on_categories_event(self, event):
+        self._refresh_track_in_table(event.track)
 
     def _load_library(self):
         folders = self.library.get_folders()
@@ -252,8 +267,11 @@ class MainWindow(QMainWindow):
             self.category_input.clear()
 
     def _on_categories_changed(self, track: Track) -> None:
-        update_categories(track, self.categories_layout)
+        update_categories(track, self.categories_layout, self._on_remove_category)
         self._refresh_track_in_table(track)
+
+    def _on_remove_category(self, category: str) -> None:
+        self.category_ctrl.remove_category(category)
 
     def _on_suggestions_changed(self, suggestions: list) -> None:
         update_suggestions(
@@ -289,6 +307,7 @@ class MainWindow(QMainWindow):
                 break
 
     def closeEvent(self, event):
+        self._bus.clear()
         self.playback_ctrl.stop()
         event.accept()
 

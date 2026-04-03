@@ -4,6 +4,7 @@ from typing import Optional
 from PyQt6.QtCore import QObject, pyqtSignal
 
 from ...core.categorizer import Categorizer
+from ...core.events import EventBus
 from ...models.track import Track
 
 
@@ -17,10 +18,12 @@ class CategoryController(QObject):
     def __init__(
         self,
         categorizer: Categorizer,
+        bus: Optional[EventBus] = None,
         parent: Optional[QObject] = None,
     ) -> None:
         super().__init__(parent)
         self._categorizer = categorizer
+        self._bus = bus
         self._current_track: Optional[Track] = None
 
     @property
@@ -30,6 +33,10 @@ class CategoryController(QObject):
     def select_track(self, track: Track) -> None:
         self._current_track = track
         self.track_details_changed.emit(track)
+        if self._bus:
+            from ...core.events import TrackSelected
+
+            self._bus.publish(TrackSelected(track=track))
         self.categories_changed.emit(track)
         self._refresh_suggestions()
 
@@ -39,6 +46,10 @@ class CategoryController(QObject):
         success = self._categorizer.add_category(self._current_track, category)
         if success:
             self.categories_changed.emit(self._current_track)
+            if self._bus:
+                from ...core.events import CategoriesChanged
+
+                self._bus.publish(CategoriesChanged(track=self._current_track))
             self._refresh_suggestions()
         return success
 
@@ -48,6 +59,10 @@ class CategoryController(QObject):
         success = self._categorizer.remove_category(self._current_track, category)
         if success:
             self.categories_changed.emit(self._current_track)
+            if self._bus:
+                from ...core.events import CategoriesChanged
+
+                self._bus.publish(CategoriesChanged(track=self._current_track))
             self._refresh_suggestions()
         return success
 
@@ -57,6 +72,14 @@ class CategoryController(QObject):
     def _refresh_suggestions(self) -> None:
         if not self._current_track:
             self.suggestions_changed.emit([])
+            if self._bus:
+                from ...core.events import SuggestionsChanged
+
+                self._bus.publish(SuggestionsChanged(suggestions=[]))
             return
         suggestions = self._categorizer.get_suggestions(self._current_track)
         self.suggestions_changed.emit(suggestions)
+        if self._bus:
+            from ...core.events import SuggestionsChanged
+
+            self._bus.publish(SuggestionsChanged(suggestions=suggestions))
