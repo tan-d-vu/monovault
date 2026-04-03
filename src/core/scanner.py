@@ -1,36 +1,48 @@
+import os
 from pathlib import Path
 from typing import Optional
-import os
 
-from .metadata import is_supported, read_metadata, read_comment, read_comment_raw
 from .library_store import LibraryStore
+from .metadata import is_supported, read_comment, read_comment_raw, read_metadata
 from ..models.track import Track
 
 
 class Scanner:
-    def __init__(self, library_store: Optional[LibraryStore] = None):
+    def __init__(self):
         self.progress_callback: Optional[callable] = None
-        self._store = library_store
 
     def scan_folder(self, folder_path: str) -> list[Track]:
+        """Scan folder for audio files and create per-folder LibraryStore.
+
+        Args:
+            folder_path: Absolute path to folder to scan
+
+        Returns:
+            List of Track objects found in folder
+        """
         folder = Path(folder_path)
         if not folder.exists() or not folder.is_dir():
             return []
+
+        # Create per-folder store for this folder
+        store = LibraryStore(base_dir=folder)
 
         audio_files = self._find_audio_files(folder)
         tracks = []
 
         for i, file_path in enumerate(audio_files):
-            track = self.process_file(file_path, folder_path)
+            track = self.process_file(file_path, folder_path, store)
             if track:
                 tracks.append(track)
 
             if self.progress_callback:
                 self.progress_callback(i + 1, len(audio_files))
 
+        store.save()
         return tracks
 
     def _find_audio_files(self, folder: Path) -> list[str]:
+        """Find all supported audio files in folder recursively."""
         audio_files = []
         for root, dirs, files in os.walk(folder):
             for filename in files:
@@ -39,7 +51,22 @@ class Scanner:
                     audio_files.append(file_path)
         return audio_files
 
-    def process_file(self, file_path: str, folder_path: str) -> Optional[Track]:
+    def process_file(
+        self,
+        file_path: str,
+        folder_path: str,
+        store: Optional[LibraryStore] = None,
+    ) -> Optional[Track]:
+        """Process a single audio file.
+
+        Args:
+            file_path: Absolute path to file
+            folder_path: Absolute path to containing folder
+            store: Optional LibraryStore for recording date_added
+
+        Returns:
+            Track object, or None if metadata cannot be read
+        """
         metadata = read_metadata(file_path)
         if not metadata:
             return None
@@ -53,7 +80,7 @@ class Scanner:
         duration = metadata.get("duration", 0.0)
         album_art = metadata.get("album_art")
 
-        date_added = self._store.record_if_new(file_path) if self._store else ""
+        date_added = store.record_if_new(file_path) if store else ""
 
         return Track(
             id=0,

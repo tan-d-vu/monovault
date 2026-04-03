@@ -30,12 +30,12 @@ from .panels import (
     get_folder_width,
 )
 from ..core.library import LibraryManager
-from ..core.library_store import LibraryStore
 from ..core.scanner import Scanner
 from ..core.playback import PlaybackEngine
 from ..core.categorizer import Categorizer
 from ..core.category_sources import ArtistCategorySource, SimilarCategoryCategorySource
 from ..core.events import EventBus
+from ..core.volume_utils import ensure_volume_id, find_volume_by_id
 from ..models.track import Track
 from .controllers import PlaybackController, SearchController, CategoryController
 
@@ -45,8 +45,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self._bus = EventBus()
         self.library = LibraryManager()
-        self.library_store = LibraryStore()
-        self.scanner = Scanner(library_store=self.library_store)
+        self.scanner = Scanner()
         self.playback_engine = PlaybackEngine()
 
         self.categorizer = Categorizer(
@@ -177,6 +176,7 @@ class MainWindow(QMainWindow):
         self._refresh_track_in_table(event.track)
 
     def _load_library(self):
+        self._reassociate_volumes()
         folders = self.library.get_folders()
         populate_folder_tree(self.folder_tree_widget, folders)
 
@@ -189,6 +189,51 @@ class MainWindow(QMainWindow):
             self._scan_folder(folder)
         self._load_tracks()
 
+    def _reassociate_volumes(self) -> None:
+        """Check each configured folder. If missing, attempt re-association.
+
+        Iterates through all configured folders. For any that no longer exist,
+        attempts to find the volume by its volume_id and update the path.
+        """
+        from pathlib import Path
+
+        config = self.library.config
+        for folder in list(config.folders):
+            if Path(folder).exists():
+                continue
+
+            # Folder is missing — find its volume_id from config
+            for vol_id, vol_info in config.volumes.items():
+                if folder in vol_info.get("paths", []):
+                    new_path = find_volume_by_id(vol_id)
+                    if new_path:
+                        new_folder = str(new_path)
+                        config.update_volume_path(vol_id, folder, new_folder)
+                    break
+
+        self.library.folders = config.get_folders()
+
+    def _register_volume(self, folder: str) -> None:
+        """Create volume_id sidecar and register in global config.
+
+        Args:
+            folder: Absolute path to folder
+        """
+        from pathlib import Path
+
+        vol_id = ensure_volume_id(Path(folder))
+        if vol_id:
+            self.library.config.register_volume(vol_id, folder)
+        else:
+            # Read-only folder — show non-modal warning
+            QMessageBox.warning(
+                self,
+                "Read-Only Folder",
+                f"Cannot create metadata in '{folder}'.\n"
+                "Categories will still be saved in file tags,\n"
+                "but date-added tracking won't be available for this folder.",
+            )
+
     def _load_tracks(self):
         self.all_tracks = self.library.get_all_tracks()
         self.playback_ctrl.set_track_list(self.all_tracks)
@@ -200,6 +245,7 @@ class MainWindow(QMainWindow):
         folder = QFileDialog.getExistingDirectory(self, "Select Music Folder")
         if folder:
             self.library.add_folder(folder)
+            self._register_volume(folder)
             self._load_library()
             self._scan_folder(folder)
 

@@ -55,7 +55,7 @@ class PlaybackController(QObject):
         self._engine.play()
         self.play_state_changed.emit(True)
         self.now_playing_changed.emit("{} - {}".format(track.title, track.artist))
-        
+
         if self._bus:
             from ...core.events import TrackPlaybackStarted
 

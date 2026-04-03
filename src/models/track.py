@@ -23,14 +23,9 @@ class Track:
 
     @property
     def location(self) -> str:
-        if not self.folder_path:
+        if not self.file_path:
             return ""
-        folder = Path(self.folder_path)
-        try:
-            relative = Path(self.file_path).relative_to(folder.parent)
-            return str(relative.parent)
-        except ValueError:
-            return ""
+        return str(Path(self.file_path).parent)
 
     @property
     def duration_formatted(self) -> str:
