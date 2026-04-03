@@ -105,7 +105,7 @@ class MainWindow(QMainWindow):
 
     def _create_menu(self):
         return  # No menu for now
-    
+
     def _create_folder_panel(self) -> QWidget:
         panel = QFrame()
         panel.setFrameStyle(QFrame.Shape.NoFrame)
@@ -187,10 +187,16 @@ class MainWindow(QMainWindow):
             0, QHeaderView.ResizeMode.ResizeToContents
         )
         self.track_table_widget.horizontalHeader().setSectionResizeMode(
-            1, QHeaderView.ResizeMode.Stretch
+            1, QHeaderView.ResizeMode.ResizeToContents
         )
         self.track_table_widget.horizontalHeader().setSectionResizeMode(
-            4, QHeaderView.ResizeMode.ResizeToContents
+            2, QHeaderView.ResizeMode.ResizeToContents
+        )
+        self.track_table_widget.horizontalHeader().setSectionResizeMode(
+            3, QHeaderView.ResizeMode.ResizeToContents
+        )
+        self.track_table_widget.horizontalHeader().setSectionResizeMode(
+            4, QHeaderView.ResizeMode.Stretch
         )
         self.track_table_widget.horizontalHeader().setSectionResizeMode(
             5, QHeaderView.ResizeMode.ResizeToContents
@@ -400,6 +406,22 @@ class MainWindow(QMainWindow):
                 item = self.track_table_widget.item(i, col)
                 if item:
                     item.setData(Qt.ItemDataRole.UserRole, track)
+
+        for col in range(6):
+            if col == 4:
+                continue
+            max_width = 0
+            for i in range(len(tracks)):
+                item = self.track_table_widget.item(i, col)
+                if item:
+                    width = (
+                        self.track_table_widget.fontMetrics()
+                        .boundingRect(item.text())
+                        .width()
+                    )
+                    max_width = max(max_width, width)
+            if max_width > 0:
+                self.track_table_widget.setColumnWidth(col, max_width)
 
     def _add_folder(self):
         folder = QFileDialog.getExistingDirectory(self, "Select Music Folder")
