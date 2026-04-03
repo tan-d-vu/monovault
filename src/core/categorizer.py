@@ -1,59 +1,41 @@
+"""Category management — add/remove categories, delegate suggestions to sources."""
+import logging
 from typing import Optional
 from ..models.track import Track
+from .interfaces import ITrackRepository, ICategorySource
 from .metadata import write_comment
+
+logger = logging.getLogger(__name__)
 
 
 class Categorizer:
-    def __init__(self, library):
-        self.library = library
+    def __init__(
+        self,
+        library: ITrackRepository,
+        sources: Optional[list] = None,
+    ) -> None:
+        self._library = library
+        self._sources: list[ICategorySource] = sources or []
 
     def get_suggestions(
         self, track: Track, max_suggestions: int = 5
     ) -> list[tuple[str, str]]:
-        if not track or not track.artist:
+        if not track:
             return []
-
-        suggestions = set()
-
-        same_artist_tracks = self.library.get_tracks_by_artist(track.artist)
-        for t in same_artist_tracks:
-            if t.id != track.id:
-                for cat in t.categories:
-                    if cat.lower() not in [c.lower() for c in track.categories]:
-                        suggestions.add(cat.lower())
-
-        if track.categories:
-            similar_tracks = self.library.get_tracks_with_categories(track.categories)
-            for t in similar_tracks:
-                if t.id != track.id:
-                    for cat in t.categories:
-                        if cat.lower() not in [c.lower() for c in track.categories]:
-                            suggestions.add(cat.lower())
-
-        existing_lower = {c.lower() for c in track.categories}
-        filtered = [s for s in suggestions if s.lower() not in existing_lower]
-
-        return [(s, self._get_source(s, track)) for s in filtered[:max_suggestions]]
-
-    def _get_source(self, category: str, track: Track) -> str:
-        same_artist = self.library.get_tracks_by_artist(track.artist)
-        for t in same_artist:
-            if t.id != track.id and category.lower() in [
-                c.lower() for c in t.categories
-            ]:
-                return "same artist"
-
-        if track.categories:
-            similar = self.library.get_tracks_with_categories(track.categories)
-            for t in similar:
-                if t.id != track.id and category.lower() in [
-                    c.lower() for c in t.categories
-                ]:
-                    return "similar category"
-
-        return "library"
+        existing = {c.lower() for c in track.categories}
+        all_suggestions: list[tuple[str, str]] = []
+        seen: set[str] = set()
+        for source in self._sources:
+            for cat, label in source.get_suggestions(track, existing, max_suggestions):
+                if cat not in seen:
+                    seen.add(cat)
+                    all_suggestions.append((cat, label))
+                    if len(all_suggestions) >= max_suggestions:
+                        return all_suggestions
+        return all_suggestions
 
     def add_category(self, track: Track, category: str) -> bool:
+        """Add a category to the track and persist to file metadata."""
         category = category.strip().lower()
         if not category or category in [c.lower() for c in track.categories]:
             return False
@@ -63,11 +45,12 @@ class Categorizer:
 
         if success:
             track.categories = new_categories
-            self.library.update_track(track)
+            self._library.update_track(track)
 
         return success
 
     def remove_category(self, track: Track, category: str) -> bool:
+        """Remove a category from the track and persist to file metadata."""
         category_lower = category.lower()
         if category_lower not in [c.lower() for c in track.categories]:
             return False
@@ -77,7 +60,7 @@ class Categorizer:
 
         if success:
             track.categories = new_categories
-            self.library.update_track(track)
+            self._library.update_track(track)
 
         return success
 
@@ -86,6 +69,6 @@ class Categorizer:
 
         if success:
             track.categories = []
-            self.library.update_track(track)
+            self._library.update_track(track)
 
         return success

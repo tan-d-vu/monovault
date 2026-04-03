@@ -38,6 +38,7 @@ from ..core.library_store import LibraryStore
 from ..core.scanner import Scanner
 from ..core.playback import PlaybackEngine
 from ..core.categorizer import Categorizer
+from ..core.category_sources import ArtistCategorySource, SimilarCategoryCategorySource
 from ..core.metadata import write_comments
 from ..models.track import Track
 
@@ -49,7 +50,13 @@ class MainWindow(QMainWindow):
         self.library_store = LibraryStore()
         self.scanner = Scanner(library_store=self.library_store)
         self.playback = PlaybackEngine()
-        self.categorizer = Categorizer(self.library)
+        self.categorizer = Categorizer(
+            self.library,
+            sources=[
+                ArtistCategorySource(self.library),
+                SimilarCategoryCategorySource(self.library),
+            ],
+        )
 
         self.all_tracks: list[Track] = []
         self.current_track: Optional[Track] = None
