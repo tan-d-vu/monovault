@@ -48,11 +48,27 @@ class Config:
             )
 
     def add_folder(self, path: str) -> bool:
-        if path not in self.folders:
-            self.folders.append(path)
-            self.save()
-            return True
-        return False
+        """Add a folder to the library.
+
+        Normalizes the path to canonical form before storing to prevent
+        duplicates from case/slash differences across platforms.
+
+        Args:
+            path: The folder path to add
+
+        Returns:
+            True if folder was added, False if already exists
+        """
+        normalized_path = str(Path(path).resolve())
+
+        # Check if normalized path already exists in folders
+        normalized_folders = [str(Path(p).resolve()) for p in self.folders]
+        if normalized_path in normalized_folders:
+            return False
+
+        self.folders.append(normalized_path)
+        self.save()
+        return True
 
     def remove_folder(self, path: str) -> bool:
         if path in self.folders:
@@ -70,19 +86,27 @@ class Config:
         If volume_id already exists, appends folder_path if not already present.
         Otherwise creates a new volume entry.
 
+        Normalizes the path to canonical form before storing to prevent
+        duplicates from case/slash differences across platforms.
+
         Args:
             volume_id: Unique volume identifier
             folder_path: Absolute path to the folder on this volume
         """
+        normalized_path = str(Path(folder_path).resolve())
+
         if volume_id not in self.volumes:
             self.volumes[volume_id] = {
-                "paths": [folder_path],
+                "paths": [normalized_path],
                 "created_at": datetime.now().isoformat(),
             }
         else:
             paths = self.volumes[volume_id].get("paths", [])
-            if folder_path not in paths:
-                paths.append(folder_path)
+            # Normalize stored paths for comparison
+            normalized_paths = [str(Path(p).resolve()) for p in paths]
+
+            if normalized_path not in normalized_paths:
+                paths.append(normalized_path)
                 self.volumes[volume_id]["paths"] = paths
 
         self.save()

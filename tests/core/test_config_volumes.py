@@ -102,3 +102,151 @@ def test_save_load_round_trip_with_volumes():
             config2 = Config()
             assert "vol_abc" in config2.volumes
             assert "/music/path" in config2.volumes["vol_abc"]["paths"]
+
+
+@pytest.mark.unit
+def test_register_volume_normalizes_trailing_slash():
+    """Should detect same path with/without trailing slash as duplicate."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with patch.object(Config, "_get_config_dir", return_value=Path(tmpdir)):
+            config = Config()
+            # Register with trailing slash
+            config.register_volume("vol_usb", f"{tmpdir}/mnt/usb/")
+            # Register without trailing slash - should be deduplicated
+            config.register_volume("vol_usb", f"{tmpdir}/mnt/usb")
+
+            paths = config.volumes["vol_usb"]["paths"]
+            assert len(paths) == 1, (
+                "Should have only one path (trailing slash normalized)"
+            )
+
+
+@pytest.mark.unit
+def test_register_volume_normalizes_symlinks():
+    """Should normalize symlinks to canonical form."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmppath = Path(tmpdir)
+
+        # Create a real directory and a symlink to it
+        real_dir = tmppath / "real_music"
+        real_dir.mkdir()
+
+        symlink_dir = tmppath / "link_music"
+        try:
+            symlink_dir.symlink_to(real_dir)
+        except OSError:
+            # Skip test on systems that don't support symlinks (e.g., Windows)
+            pytest.skip("Symlinks not supported on this system")
+
+        with patch.object(Config, "_get_config_dir", return_value=Path(tmpdir)):
+            config = Config()
+            # Register using both symlink and real path
+            config.register_volume("vol_music", str(symlink_dir))
+            config.register_volume("vol_music", str(real_dir))
+
+            paths = config.volumes["vol_music"]["paths"]
+            assert len(paths) == 1, "Should deduplicate symlink and real path"
+
+
+@pytest.mark.unit
+def test_add_folder_normalizes_trailing_slash():
+    """Should detect same folder with/without trailing slash as duplicate."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with patch.object(Config, "_get_config_dir", return_value=Path(tmpdir)):
+            config = Config()
+            # Add with trailing slash
+            result1 = config.add_folder(f"{tmpdir}/music/")
+            assert result1 is True
+
+            # Add without trailing slash - should be deduplicated
+            result2 = config.add_folder(f"{tmpdir}/music")
+            assert result2 is False, "Should not add duplicate path"
+
+            assert len(config.folders) == 1
+
+
+@pytest.mark.unit
+def test_add_folder_normalizes_symlinks():
+    """Should normalize symlinks to canonical form."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmppath = Path(tmpdir)
+
+        # Create a real directory and a symlink to it
+        real_dir = tmppath / "real_music"
+        real_dir.mkdir()
+
+        symlink_dir = tmppath / "link_music"
+        try:
+            symlink_dir.symlink_to(real_dir)
+        except OSError:
+            # Skip test on systems that don't support symlinks
+            pytest.skip("Symlinks not supported on this system")
+
+        with patch.object(Config, "_get_config_dir", return_value=Path(tmpdir)):
+            config = Config()
+            # Add using both symlink and real path
+            result1 = config.add_folder(str(symlink_dir))
+            assert result1 is True
+
+            result2 = config.add_folder(str(real_dir))
+            assert result2 is False, "Should deduplicate symlink and real path"
+
+            assert len(config.folders) == 1
+
+
+@pytest.mark.unit
+def test_cross_computer_same_volume_different_paths():
+    """Test scenario: Computer1 and Computer2 add different paths to same volume."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with patch.object(Config, "_get_config_dir", return_value=Path(tmpdir)):
+            config = Config()
+
+            # Computer1 mounts flash drive at D:\FlashDrive\
+            config.register_volume("flash_drive_001", f"{tmpdir}/D/music")
+
+            # Computer2 mounts same flash drive at /Volumes/FlashDrive/
+            config.register_volume("flash_drive_001", f"{tmpdir}/volumes/music")
+
+            # Both paths should exist since they're different
+            paths = config.volumes["flash_drive_001"]["paths"]
+            assert len(paths) == 2
+            assert any("D" in p for p in paths)
+            assert any("volumes" in p for p in paths)
+
+
+@pytest.mark.unit
+def test_register_volume_stores_canonical_path():
+    """Should store normalized canonical form in config."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with patch.object(Config, "_get_config_dir", return_value=Path(tmpdir)):
+            config = Config()
+
+            # Register with relative path
+            original_path = "./music/library"
+            config.register_volume("vol123", original_path)
+
+            # Path should be stored as absolute canonical form
+            stored_path = config.volumes["vol123"]["paths"][0]
+            assert Path(stored_path).is_absolute()
+            # Should not contain . or .. in the path
+            assert ".." not in stored_path
+            assert "/." not in stored_path
+
+
+@pytest.mark.unit
+def test_add_folder_stores_canonical_path():
+    """Should store normalized canonical form in config."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with patch.object(Config, "_get_config_dir", return_value=Path(tmpdir)):
+            config = Config()
+
+            # Add with relative path
+            original_path = "./music/library"
+            config.add_folder(original_path)
+
+            # Path should be stored as absolute canonical form
+            stored_path = config.folders[0]
+            assert Path(stored_path).is_absolute()
+            # Should not contain . or .. in the path
+            assert ".." not in stored_path
+            assert "/." not in stored_path

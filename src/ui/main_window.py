@@ -1,3 +1,4 @@
+import os
 import sys
 import subprocess
 import platform
@@ -243,11 +244,21 @@ class MainWindow(QMainWindow):
 
     def _add_folder(self):
         folder = QFileDialog.getExistingDirectory(self, "Select Music Folder")
-        if folder:
-            self.library.add_folder(folder)
-            self._register_volume(folder)
-            self._load_library()
-            self._scan_folder(folder)
+        if not folder:
+            return
+
+        if not os.access(folder, os.W_OK):
+            QMessageBox.warning(
+                self,
+                "Read-Only Folder",
+                "This folder is read-only. MonoVault requires write access to store metadata.",
+            )
+            return
+
+        self.library.add_folder(folder)
+        self._register_volume(folder)
+        self._load_library()
+        self._scan_folder(folder)
 
     def _scan_folder(self, folder_path: str):
         tracks = self.scanner.scan_folder(folder_path)

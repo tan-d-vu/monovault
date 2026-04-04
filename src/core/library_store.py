@@ -76,12 +76,13 @@ class LibraryStore:
         """Convert file path to storage key.
 
         Converts absolute path to relative POSIX path from base_dir.
+        Falls back to absolute POSIX path for files outside base_dir.
 
         Args:
             file_path: Absolute file path
 
         Returns:
-            Relative POSIX path string
+            POSIX path string (relative if inside base_dir, absolute otherwise)
         """
         try:
             rel_path = Path(file_path).relative_to(self._base_dir)
@@ -92,7 +93,8 @@ class LibraryStore:
                 f"File '{file_path}' is outside base_dir '{self._base_dir}'. "
                 "Using absolute path as key."
             )
-            return file_path
+            # Convert to POSIX format even for absolute paths
+            return str(PurePosixPath(file_path))
 
     def _load(self) -> None:
         """Load data from library.json if it exists."""

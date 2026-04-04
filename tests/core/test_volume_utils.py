@@ -57,18 +57,6 @@ def test_ensure_volume_id_creates_new():
 
 
 @pytest.mark.unit
-def test_ensure_volume_id_reads_existing():
-    """Should return existing volume_id without overwriting."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        folder = Path(tmpdir)
-        # Create first
-        vol_id1 = ensure_volume_id(folder)
-        # Ensure again
-        vol_id2 = ensure_volume_id(folder)
-        assert vol_id1 == vol_id2
-
-
-@pytest.mark.unit
 def test_ensure_volume_id_readonly():
     """Should return None on read-only dir without crash."""
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -79,6 +67,80 @@ def test_ensure_volume_id_readonly():
             assert result is None
         finally:
             folder.chmod(0o755)  # Restore permissions
+
+
+@pytest.mark.unit
+def test_ensure_volume_id_reads_existing():
+    """When volume_id file exists, should read and return it without creating new."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        folder = Path(tmpdir)
+        # Manually create volume_id file with specific ID
+        fixed_id = "vol_abc123def456ghi789jkl0123"
+        monovault_dir = folder / ".monovault"
+        monovault_dir.mkdir(parents=True, exist_ok=True)
+        volume_id_file = monovault_dir / "volume_id"
+        volume_id_file.write_text(fixed_id)
+
+        # Call ensure_volume_id
+        result = ensure_volume_id(folder)
+
+        # Should return the existing ID, not generate a new one
+        assert result == fixed_id
+        # Verify it's still the same file (not overwritten)
+        assert volume_id_file.read_text().strip() == fixed_id
+
+
+@pytest.mark.unit
+def test_ensure_volume_id_generates_new_if_missing():
+    """When no volume_id file, should generate new one."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        folder = Path(tmpdir)
+        # Ensure no .monovault directory exists
+        assert not (folder / ".monovault").exists()
+
+        result = ensure_volume_id(folder)
+
+        # Should generate a new ID
+        assert result is not None
+        assert len(result) == 32
+        assert all(c in "0123456789abcdef" for c in result)
+        # Should create the file
+        assert (folder / ".monovault" / "volume_id").exists()
+
+
+@pytest.mark.unit
+def test_ensure_volume_id_returns_none_on_read_only():
+    """When write fails (OSError), should return None gracefully."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        folder = Path(tmpdir)
+        # Create .monovault dir but make it read-only
+        monovault_dir = folder / ".monovault"
+        monovault_dir.mkdir(parents=True, exist_ok=True)
+        monovault_dir.chmod(0o444)
+
+        try:
+            result = ensure_volume_id(folder)
+            # Should return None due to permission error
+            assert result is None
+        finally:
+            monovault_dir.chmod(0o755)  # Restore permissions
+
+
+@pytest.mark.unit
+def test_ensure_volume_id_idempotent():
+    """Multiple calls to same folder return same ID."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        folder = Path(tmpdir)
+
+        # Call three times
+        id1 = ensure_volume_id(folder)
+        id2 = ensure_volume_id(folder)
+        id3 = ensure_volume_id(folder)
+
+        # All should be identical
+        assert id1 == id2 == id3
+        assert id1 is not None
+        assert len(id1) == 32
 
 
 @pytest.mark.unit
