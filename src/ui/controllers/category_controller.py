@@ -1,11 +1,16 @@
 """Category controller — manages category CRUD and suggestions for the selected track."""
 
+import logging
 from typing import Optional
-from PyQt6.QtCore import QObject, pyqtSignal
+
+from PyQt6.QtCore import QObject, pyqtSignal, QThreadPool
 
 from ...core.categorizer import Categorizer
 from ...core.events import EventBus
 from ...models.track import Track
+from ..workers.metadata_worker import MetadataWriteWorker
+
+logger = logging.getLogger(__name__)
 
 
 class CategoryController(QObject):
@@ -14,6 +19,7 @@ class CategoryController(QObject):
     categories_changed = pyqtSignal(Track)
     suggestions_changed = pyqtSignal(list)
     track_details_changed = pyqtSignal(Track)
+    write_failed = pyqtSignal(str, str)
 
     def __init__(
         self,
@@ -25,6 +31,8 @@ class CategoryController(QObject):
         self._categorizer = categorizer
         self._bus = bus
         self._current_track: Optional[Track] = None
+        self._write_pool = QThreadPool(self)
+        self._write_pool.setMaxThreadCount(1)
 
     @property
     def current_track(self) -> Optional[Track]:
@@ -43,31 +51,79 @@ class CategoryController(QObject):
     def add_category(self, category: str) -> bool:
         if not self._current_track:
             return False
-        success = self._categorizer.add_category(self._current_track, category)
-        if success:
-            self.categories_changed.emit(self._current_track)
-            if self._bus:
-                from ...core.events import CategoriesChanged
+        validated = self._categorizer.parse_add_category(self._current_track, category)
+        if validated is None:
+            return False
 
-                self._bus.publish(CategoriesChanged(track=self._current_track))
-            self._refresh_suggestions()
-        return success
+        new_categories = list(self._current_track.categories) + [validated]
+        self._categorizer.apply_categories(self._current_track, new_categories)
+        self.categories_changed.emit(self._current_track)
+        if self._bus:
+            from ...core.events import CategoriesChanged
+
+            self._bus.publish(CategoriesChanged(track=self._current_track))
+        self._refresh_suggestions()
+        self._schedule_write(self._current_track.file_path, new_categories)
+        return True
 
     def remove_category(self, category: str) -> bool:
         if not self._current_track:
             return False
-        success = self._categorizer.remove_category(self._current_track, category)
-        if success:
-            self.categories_changed.emit(self._current_track)
-            if self._bus:
-                from ...core.events import CategoriesChanged
+        validated = self._categorizer.parse_remove_category(
+            self._current_track, category
+        )
+        if validated is None:
+            return False
 
-                self._bus.publish(CategoriesChanged(track=self._current_track))
-            self._refresh_suggestions()
-        return success
+        new_categories = [
+            c for c in self._current_track.categories if c.lower() != validated
+        ]
+        self._categorizer.apply_categories(self._current_track, new_categories)
+        self.categories_changed.emit(self._current_track)
+        if self._bus:
+            from ...core.events import CategoriesChanged
+
+            self._bus.publish(CategoriesChanged(track=self._current_track))
+        self._refresh_suggestions()
+        self._schedule_write(self._current_track.file_path, new_categories)
+        return True
+
+    def clear_categories(self) -> bool:
+        if not self._current_track:
+            return False
+
+        self._categorizer.apply_categories(self._current_track, [])
+        self.categories_changed.emit(self._current_track)
+        if self._bus:
+            from ...core.events import CategoriesChanged
+
+            self._bus.publish(CategoriesChanged(track=self._current_track))
+        self._refresh_suggestions()
+        self._schedule_write(self._current_track.file_path, [])
+        return True
 
     def accept_suggestion(self, category: str) -> bool:
         return self.add_category(category)
+
+    def _schedule_write(self, file_path: str, categories: list[str]) -> None:
+        worker = MetadataWriteWorker(file_path, categories)
+        worker.signals.finished.connect(self._on_write_finished)
+        self._write_pool.start(worker)
+
+    def _on_write_finished(self, file_path: str, success: bool, error_msg: str) -> None:
+        if success:
+            logger.debug("Successfully wrote metadata for %s", file_path)
+        else:
+            msg = error_msg or "Unknown error"
+            logger.warning("Failed to write metadata for %s: %s", file_path, msg)
+            self.write_failed.emit(file_path, msg)
+
+    def shutdown(self) -> None:
+        # Cancel pending-but-not-started workers, then drain running ones.
+        # Clear first so in-flight signals from cancelled workers don't deliver
+        # to a partially-torn-down controller.
+        self._write_pool.clear()
+        self._write_pool.waitForDone(5000)
 
     def _refresh_suggestions(self) -> None:
         if not self._current_track:

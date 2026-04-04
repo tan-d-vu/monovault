@@ -4,7 +4,6 @@ import logging
 from typing import Optional
 from ..models.track import Track
 from .interfaces import ITrackRepository, ICategorySource
-from .metadata import write_comment
 
 logger = logging.getLogger(__name__)
 
@@ -35,41 +34,31 @@ class Categorizer:
                         return all_suggestions
         return all_suggestions
 
-    def add_category(self, track: Track, category: str) -> bool:
-        """Add a category to the track and persist to file metadata."""
+    def parse_add_category(self, track: Track, category: str) -> Optional[str]:
+        """Normalize and validate a category for addition.
+
+        Strips whitespace, lowercases, and rejects empty or duplicate values.
+        Returns the normalized category string, or None if it should be rejected.
+        """
         category = category.strip().lower()
-        if not category or category in [c.lower() for c in track.categories]:
-            return False
+        if not category:
+            return None
+        if category in [c.lower() for c in track.categories]:
+            return None
+        return category
 
-        new_categories = track.categories + [category]
-        success = write_comment(track.file_path, new_categories)
+    def parse_remove_category(self, track: Track, category: str) -> Optional[str]:
+        """Find the matching category to remove, case-insensitively.
 
-        if success:
-            track.categories = new_categories
-            self._library.update_track(track)
-
-        return success
-
-    def remove_category(self, track: Track, category: str) -> bool:
-        """Remove a category from the track and persist to file metadata."""
+        Returns the normalized (lowercased) category string if found, or None.
+        """
         category_lower = category.lower()
-        if category_lower not in [c.lower() for c in track.categories]:
-            return False
+        for c in track.categories:
+            if c.lower() == category_lower:
+                return category_lower
+        return None
 
-        new_categories = [c for c in track.categories if c.lower() != category_lower]
-        success = write_comment(track.file_path, new_categories)
-
-        if success:
-            track.categories = new_categories
-            self._library.update_track(track)
-
-        return success
-
-    def clear_categories(self, track: Track) -> bool:
-        success = write_comment(track.file_path, [])
-
-        if success:
-            track.categories = []
-            self._library.update_track(track)
-
-        return success
+    def apply_categories(self, track: Track, categories: list[str]) -> None:
+        """Overwrite the track's categories in-memory and update the library store."""
+        track.categories = categories
+        self._library.update_track(track)

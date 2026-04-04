@@ -69,8 +69,8 @@ class MainWindow(QMainWindow):
 
         self._setup_ui()
         self._connect_controllers()
-        self._subscribe_events()
         self._load_library()
+        self.statusBar().showMessage("Ready")
 
     def _setup_ui(self):
         self.setWindowTitle("MonoVault")
@@ -167,14 +167,12 @@ class MainWindow(QMainWindow):
         self.category_ctrl.categories_changed.connect(self._on_categories_changed)
         self.category_ctrl.suggestions_changed.connect(self._on_suggestions_changed)
         self.category_ctrl.track_details_changed.connect(self._on_track_details_changed)
+        self.category_ctrl.write_failed.connect(self._on_write_failed)
 
-    def _subscribe_events(self):
-        from ..core.events import CategoriesChanged
-
-        self._bus.subscribe(CategoriesChanged, self._on_categories_event)
-
-    def _on_categories_event(self, event):
-        self._refresh_track_in_table(event.track)
+    def _on_write_failed(self, file_path: str, msg: str) -> None:
+        self.statusBar().showMessage(
+            f"Failed to save categories for {os.path.basename(file_path)}: {msg}", 5000
+        )
 
     def _load_library(self):
         self._reassociate_volumes()
@@ -392,6 +390,7 @@ class MainWindow(QMainWindow):
                 break
 
     def closeEvent(self, event):
+        self.category_ctrl.shutdown()
         self._bus.clear()
         self.playback_ctrl.stop()
         event.accept()

@@ -235,7 +235,6 @@ class TestReadOnlyMountRejection:
         """Read-only folder should show warning and not add."""
         from unittest.mock import MagicMock
 
-
         from src.ui.main_window import MainWindow
 
         # Create read-only folder
@@ -269,7 +268,6 @@ class TestReadOnlyMountRejection:
     def test_read_only_folder_no_volume_register(self, qapp, tmp_path, monkeypatch):
         """Read-only folder should not register volume."""
         from unittest.mock import MagicMock
-
 
         from src.ui.main_window import MainWindow
 

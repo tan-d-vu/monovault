@@ -1,6 +1,6 @@
 """Tests for Categorizer with pluggable sources."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 from src.core.categorizer import Categorizer
 from src.models.track import Track
 
@@ -65,81 +65,72 @@ class TestCategorizerGetSuggestions:
     def test_none_track_returns_empty(self):
         library = MagicMock()
         categorizer = Categorizer(library)
-        result = categorizer.get_suggestions(None)
+        result = categorizer.get_suggestions(None)  # type: ignore[arg-type]
         assert result == []
 
 
-class TestCategorizerAddCategory:
-    def test_add_category_success(self):
+class TestCategorizerParseAddCategory:
+    def test_returns_normalized_category(self):
         library = MagicMock()
         categorizer = Categorizer(library)
         track = make_track(categories=["rock"])
-        with patch(
-            "src.core.categorizer.write_comment", return_value=True
-        ) as mock_write:
-            result = categorizer.add_category(track, "jazz")
-        assert result is True
-        assert "jazz" in track.categories
-        library.update_track.assert_called_once_with(track)
-        mock_write.assert_called_once_with("/tmp/track.mp3", ["rock", "jazz"])
+        result = categorizer.parse_add_category(track, "  Jazz  ")
+        assert result == "jazz"
 
-    def test_add_duplicate_category_returns_false(self):
-        library = MagicMock()
-        categorizer = Categorizer(library)
-        track = make_track(categories=["rock"])
-        with patch("src.core.categorizer.write_comment", return_value=True):
-            result = categorizer.add_category(track, "Rock")
-        assert result is False
-        library.update_track.assert_not_called()
-
-    def test_add_empty_category_returns_false(self):
+    def test_returns_none_for_empty(self):
         library = MagicMock()
         categorizer = Categorizer(library)
         track = make_track()
-        result = categorizer.add_category(track, "  ")
-        assert result is False
+        assert categorizer.parse_add_category(track, "  ") is None
 
-    def test_add_category_write_failure_rolls_back(self):
+    def test_returns_none_for_duplicate(self):
         library = MagicMock()
         categorizer = Categorizer(library)
         track = make_track(categories=["rock"])
-        with patch("src.core.categorizer.write_comment", return_value=False):
-            result = categorizer.add_category(track, "jazz")
-        assert result is False
-        assert "jazz" not in track.categories
-        library.update_track.assert_not_called()
+        assert categorizer.parse_add_category(track, "Rock") is None
 
-
-class TestCategorizerRemoveCategory:
-    def test_remove_category_success(self):
+    def test_case_insensitive_duplicate_check(self):
         library = MagicMock()
         categorizer = Categorizer(library)
-        track = make_track(categories=["rock", "jazz"])
-        with patch(
-            "src.core.categorizer.write_comment", return_value=True
-        ) as mock_write:
-            result = categorizer.remove_category(track, "rock")
-        assert result is True
-        assert "rock" not in track.categories
-        assert "jazz" in track.categories
+        track = make_track(categories=["ROCK"])
+        assert categorizer.parse_add_category(track, "rock") is None
+
+
+class TestCategorizerParseRemoveCategory:
+    def test_returns_lowercased_match(self):
+        library = MagicMock()
+        categorizer = Categorizer(library)
+        track = make_track(categories=["Rock", "jazz"])
+        result = categorizer.parse_remove_category(track, "Rock")
+        assert result == "rock"
+
+    def test_case_insensitive_match(self):
+        library = MagicMock()
+        categorizer = Categorizer(library)
+        track = make_track(categories=["Rock"])
+        result = categorizer.parse_remove_category(track, "ROCK")
+        assert result == "rock"
+
+    def test_returns_none_when_not_found(self):
+        library = MagicMock()
+        categorizer = Categorizer(library)
+        track = make_track(categories=["rock"])
+        assert categorizer.parse_remove_category(track, "jazz") is None
+
+
+class TestCategorizerApplyCategories:
+    def test_overwrites_categories_and_updates_library(self):
+        library = MagicMock()
+        categorizer = Categorizer(library)
+        track = make_track(categories=["rock"])
+        categorizer.apply_categories(track, ["jazz", "pop"])
+        assert track.categories == ["jazz", "pop"]
         library.update_track.assert_called_once_with(track)
-        mock_write.assert_called_once_with("/tmp/track.mp3", ["jazz"])
 
-    def test_remove_missing_category_returns_false(self):
-        library = MagicMock()
-        categorizer = Categorizer(library)
-        track = make_track(categories=["rock"])
-        with patch("src.core.categorizer.write_comment", return_value=True):
-            result = categorizer.remove_category(track, "jazz")
-        assert result is False
-        library.update_track.assert_not_called()
-
-    def test_remove_category_write_failure_rolls_back(self):
+    def test_clears_all_categories(self):
         library = MagicMock()
         categorizer = Categorizer(library)
         track = make_track(categories=["rock", "jazz"])
-        with patch("src.core.categorizer.write_comment", return_value=False):
-            result = categorizer.remove_category(track, "rock")
-        assert result is False
-        assert "rock" in track.categories
-        library.update_track.assert_not_called()
+        categorizer.apply_categories(track, [])
+        assert track.categories == []
+        library.update_track.assert_called_once_with(track)
