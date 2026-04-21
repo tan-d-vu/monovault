@@ -93,7 +93,7 @@ pyinstaller --onefile --windowed src/ui/main_window.py
 
 ### Types
 - Use type hints for all function signatures
-- Use `Optional[X]` instead of `X | None`
+- Use `X | None` instead of `Optional[X]` (PEP 604, Python 3.10+)
 - Use built-in types directly: `list[str]`, `dict[str, int]`
 - Use dataclasses for simple data containers
 
@@ -123,7 +123,7 @@ class Track:
     album: str
     duration: float
     categories: list[str]
-    album_art: Optional[bytes]
+    album_art: bytes | None
     folder_path: str
     comments: str = ""
     date_added: str = ""

@@ -4,12 +4,7 @@ MonoVault has the following Python dependencies.
 
 ## Installation
 
-Install all dependencies:
-```bash
-pip install -r requirements.txt
-```
-
-Or install with development dependencies:
+Install with development dependencies:
 ```bash
 pip install -e ".[dev]"
 ```
@@ -46,7 +41,7 @@ MonoVault requires **Python 3.10 or higher**.
    ```
 3. Install dependencies:
    ```bash
-   pip install -r requirements.txt
+   pip install -e ".[dev]"
    ```
 4. Run the application:
    ```bash
