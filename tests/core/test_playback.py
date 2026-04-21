@@ -64,9 +64,7 @@ class TestInitialState:
         assert mocked_engine._duration == 0
 
     def test_audio_output_wired_to_player(self, mocked_engine):
-        mocked_engine.player.setAudioOutput.assert_called_once_with(
-            mocked_engine.audio
-        )
+        mocked_engine.player.setAudioOutput.assert_called_once_with(mocked_engine.audio)
 
     def test_default_volume_is_seventy_percent(self, mocked_engine):
         mocked_engine.audio.setVolume.assert_called_once_with(0.7)
@@ -135,9 +133,7 @@ class TestSignals:
         # PlaybackState enum into *some* integer on emission. We don't care
         # what that integer is — only that the signal fires exactly once
         # per state transition.
-        with qtbot.waitSignal(
-            mocked_engine.playback_state_changed, timeout=500
-        ) as blocker:
+        with qtbot.waitSignal(mocked_engine.playback_state_changed, timeout=500) as blocker:
             mocked_engine._on_state_changed(QMediaPlayer.PlaybackState.PlayingState)
         assert len(blocker.args) == 1
         assert isinstance(blocker.args[0], int)
@@ -165,27 +161,19 @@ class TestVolume:
 @pytest.mark.unit
 class TestStateQueries:
     def test_is_playing_true_when_player_is_playing(self, mocked_engine):
-        mocked_engine.player.playbackState.return_value = (
-            QMediaPlayer.PlaybackState.PlayingState
-        )
+        mocked_engine.player.playbackState.return_value = QMediaPlayer.PlaybackState.PlayingState
         assert mocked_engine.is_playing() is True
 
     def test_is_playing_false_when_paused(self, mocked_engine):
-        mocked_engine.player.playbackState.return_value = (
-            QMediaPlayer.PlaybackState.PausedState
-        )
+        mocked_engine.player.playbackState.return_value = QMediaPlayer.PlaybackState.PausedState
         assert mocked_engine.is_playing() is False
 
     def test_is_paused_true_when_paused(self, mocked_engine):
-        mocked_engine.player.playbackState.return_value = (
-            QMediaPlayer.PlaybackState.PausedState
-        )
+        mocked_engine.player.playbackState.return_value = QMediaPlayer.PlaybackState.PausedState
         assert mocked_engine.is_paused() is True
 
     def test_is_paused_false_when_playing(self, mocked_engine):
-        mocked_engine.player.playbackState.return_value = (
-            QMediaPlayer.PlaybackState.PlayingState
-        )
+        mocked_engine.player.playbackState.return_value = QMediaPlayer.PlaybackState.PlayingState
         assert mocked_engine.is_paused() is False
 
     def test_get_position_delegates_to_player(self, mocked_engine):
@@ -201,6 +189,4 @@ class TestStateQueries:
 class TestErrorHandling:
     def test_error_handler_does_not_raise(self, mocked_engine):
         # _on_error is a print-only handler; it should tolerate any input
-        mocked_engine._on_error(
-            QMediaPlayer.Error.ResourceError, "Resource unavailable"
-        )
+        mocked_engine._on_error(QMediaPlayer.Error.ResourceError, "Resource unavailable")

@@ -104,9 +104,7 @@ class TestFindAudioFiles:
 class TestProcessFile:
     def test_nonexistent_file_returns_none(self, tmp_path):
         scanner = Scanner()
-        result = scanner.process_file(
-            str(tmp_path / "missing.mp3"), str(tmp_path), store=None
-        )
+        result = scanner.process_file(str(tmp_path / "missing.mp3"), str(tmp_path), store=None)
         assert result is None
 
     def test_unreadable_metadata_returns_none(self, tmp_path):

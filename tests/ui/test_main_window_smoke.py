@@ -58,9 +58,7 @@ class TestChildWidgets:
 
 @pytest.mark.unit
 class TestLibraryIntegration:
-    def test_adding_folder_populates_folder_tree(
-        self, main_window_fixture, tmp_path
-    ):
+    def test_adding_folder_populates_folder_tree(self, main_window_fixture, tmp_path):
         music_folder = tmp_path / "music"
         music_folder.mkdir()
 
@@ -80,9 +78,7 @@ class TestLibraryIntegration:
             == str(music_folder.resolve())
         )
 
-    def test_adding_folder_with_tracks_round_trips(
-        self, main_window_fixture, tmp_path
-    ):
+    def test_adding_folder_with_tracks_round_trips(self, main_window_fixture, tmp_path):
         music_folder = tmp_path / "music"
         music_folder.mkdir()
         main_window_fixture.library.add_folder(str(music_folder))
@@ -105,9 +101,7 @@ class TestAddFolderDialog:
         main_window_fixture._add_folder()
         assert main_window_fixture.library.get_folders() == []
 
-    def test_successful_dialog_adds_folder(
-        self, main_window_fixture, monkeypatch, tmp_path
-    ):
+    def test_successful_dialog_adds_folder(self, main_window_fixture, monkeypatch, tmp_path):
         music_folder = tmp_path / "music"
         music_folder.mkdir()
 
