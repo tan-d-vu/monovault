@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import (
     QTableWidget,
     QLineEdit,
     QLabel,
+    QProgressBar,
     QPushButton,
     QSlider,
     QFrame,
@@ -388,3 +389,35 @@ def get_folder_width(tree: QTreeWidget, folders: list[str]) -> int:
     metrics = QFontMetrics(font)
     max_width = max(metrics.horizontalAdvance(f) for f in folders)
     return max_width + 40
+
+
+def create_scan_progress_bar() -> tuple[QWidget, QLabel, QProgressBar, QPushButton]:
+    """Non-modal progress row — shown during folder scans, hidden when idle."""
+    bar = QFrame()
+    bar.setFixedHeight(32)
+    bar.setStyleSheet(
+        f"background-color: {THEME['secondary_bg']}; border-top: 1px solid {THEME['border']};"
+    )
+
+    layout = QHBoxLayout(bar)
+    layout.setContentsMargins(12, 4, 12, 4)
+    layout.setSpacing(12)
+
+    status_label = QLabel("")
+    status_label.setStyleSheet(f"color: {THEME['text_secondary']};")
+    layout.addWidget(status_label, 1)
+
+    progress_bar = QProgressBar()
+    progress_bar.setRange(0, 100)
+    progress_bar.setValue(0)
+    progress_bar.setFixedWidth(240)
+    progress_bar.setTextVisible(False)
+    layout.addWidget(progress_bar)
+
+    cancel_btn = QPushButton("Cancel")
+    cancel_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+    cancel_btn.setStyleSheet(f"border: 1px solid {THEME['border']}; padding: 4px 10px;")
+    layout.addWidget(cancel_btn)
+
+    bar.hide()
+    return bar, status_label, progress_bar, cancel_btn
