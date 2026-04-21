@@ -16,26 +16,45 @@ MusicVault is a lightweight desktop music file manager with manual categorizatio
 
 ```
 monovault/
-├── venv/                    # Virtual environment
+├── venv/                        # Virtual environment
 ├── src/
-│   ├── models/              # Data models (Track dataclass)
-│   ├── core/                # Business logic
-│   │   ├── config.py        # JSON config for folders
-│   │   ├── library.py       # In-memory library manager
-│   │   ├── library_store.py # File mtime cache
-│   │   ├── metadata.py      # Audio metadata read/write
-│   │   ├── scanner.py       # Library folder scanner
-│   │   ├── playback.py      # Audio playback engine
-│   │   └── categorizer.py   # Category suggestions
-│   └── ui/                  # PyQt UI components
-│       ├── main_window.py   # Main application window
-│       ├── widgets.py       # Custom widgets
-│       └── styles.py        # UI theme/styles
-├── tests/                   # Test suite
-├── resources/               # Icons, images
-├── pyproject.toml           # Project configuration
-├── SPEC.md                  # Full specification
-└── AGENTS.md                # This file
+│   ├── models/                  # Data models (Track dataclass)
+│   │   └── track.py
+│   ├── core/                    # Business logic
+│   │   ├── config.py            # JSON config for folders
+│   │   ├── library.py           # In-memory library manager
+│   │   ├── library_store.py     # File mtime cache
+│   │   ├── metadata/            # Audio metadata read/write (format registry)
+│   │   │   ├── __init__.py      # Public API (read_metadata, write_comment, ...)
+│   │   │   ├── base.py          # Abstract parser base
+│   │   │   ├── mp3_parser.py    # ID3/MP3 parser
+│   │   │   ├── flac_parser.py   # Vorbis/FLAC parser
+│   │   │   └── registry.py      # Parser registry by extension
+│   │   ├── scanner.py           # Library folder scanner
+│   │   ├── playback.py          # Audio playback engine
+│   │   ├── categorizer.py       # Category add/remove orchestration
+│   │   ├── category_sources.py  # Pluggable suggestion sources
+│   │   ├── interfaces.py        # Protocol interfaces (IMetadataParser, ITrackRepository, ICategorySource)
+│   │   ├── events.py            # EventBus and domain event dataclasses
+│   │   └── volume_utils.py      # Portable/flash-drive volume identification
+│   └── ui/                      # PyQt UI components
+│       ├── main_window.py       # Main application window
+│       ├── panels.py            # Folder tree, track details, playback bar panels
+│       ├── track_table.py       # Track table widget and column enum
+│       ├── widgets.py           # CategoryPill, SuggestionButton
+│       ├── styles.py            # UI theme/styles
+│       ├── scanner_worker.py    # Background folder-scan QThread worker
+│       ├── controllers/         # Decoupled controllers bound to MainWindow
+│       │   ├── playback_controller.py
+│       │   ├── search_controller.py
+│       │   └── category_controller.py
+│       └── workers/             # Background QThread workers
+│           └── metadata_worker.py
+├── tests/                       # Test suite
+├── resources/                   # Icons, images
+├── pyproject.toml               # Project configuration
+├── SPEC.md                      # Full specification
+└── AGENTS.md                    # This file
 ```
 
 ## Build, Test & Lint Commands
@@ -93,7 +112,7 @@ pyinstaller --onefile --windowed src/ui/main_window.py
 
 ### Types
 - Use type hints for all function signatures
-- Use `X | None` instead of `Optional[X]` (PEP 604, Python 3.10+)
+- Use `Optional[X]` instead of `X | None`
 - Use built-in types directly: `list[str]`, `dict[str, int]`
 - Use dataclasses for simple data containers
 
@@ -123,7 +142,7 @@ class Track:
     album: str
     duration: float
     categories: list[str]
-    album_art: bytes | None
+    album_art: Optional[bytes]
     folder_path: str
     comments: str = ""
     date_added: str = ""
@@ -170,12 +189,27 @@ class LibraryManager(ITrackRepository):
 
 | Module | Purpose |
 |--------|---------|
-| `library.py` | In-memory track storage, search, deduplication |
-| `config.py` | JSON config file management |
-| `metadata.py` | Audio file metadata read/write via mutagen |
-| `scanner.py` | Recursive folder scanning for audio files |
-| `playback.py` | QMediaPlayer wrapper |
-| `categorizer.py` | Category suggestion algorithm |
+| `src/core/library.py` | In-memory track storage, search, deduplication |
+| `src/core/library_store.py` | Persists track addition dates and file mtime cache |
+| `src/core/config.py` | JSON config file management |
+| `src/core/metadata/` | Audio metadata read/write via `mutagen`; format-registry package |
+| `src/core/scanner.py` | Recursive folder scanning for audio files |
+| `src/core/playback.py` | `QMediaPlayer` wrapper with position/duration/state signals |
+| `src/core/categorizer.py` | Add/remove categories; writes via `metadata.write_comment` |
+| `src/core/category_sources.py` | Pluggable suggestion sources (by artist, by shared category) |
+| `src/core/interfaces.py` | Protocol interfaces for parsers, repositories, suggestion sources |
+| `src/core/events.py` | `EventBus` and frozen-dataclass domain events |
+| `src/core/volume_utils.py` | Volume identification for portable/flash-drive support |
+| `src/ui/main_window.py` | `MainWindow` — layout creation and controller wiring |
+| `src/ui/panels.py` | Folder tree, track details, and playback bar panels |
+| `src/ui/track_table.py` | Track table widget with column enum |
+| `src/ui/widgets.py` | `CategoryPill`, `SuggestionButton` |
+| `src/ui/styles.py` | `THEME` dict and global `STYLESHEET` |
+| `src/ui/controllers/playback_controller.py` | Playback state, track navigation, seeking |
+| `src/ui/controllers/search_controller.py` | Debounced search with result set management |
+| `src/ui/controllers/category_controller.py` | Category CRUD and suggestions for selected track |
+| `src/ui/scanner_worker.py` | Background folder-scan worker (QThread) with progress/cancel |
+| `src/ui/workers/metadata_worker.py` | Background metadata scanning on a `QThread` |
 
 ## Known Limitations
 

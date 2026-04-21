@@ -46,7 +46,7 @@ The **library is purely in-memory**; files are the source of truth. On every lau
 | `src/core/library.py` | In-memory `dict[int, Track]` store; search; tracks by artist/category |
 | `src/core/library_store.py` | Persists track addition dates to `~/.monovault/library.json` |
 | `src/core/scanner.py` | Recursively scans folders for MP3/FLAC, returns `Track` objects |
-| `src/core/metadata.py` | Reads ID3/Vorbis tags via `mutagen`; `write_comment()` saves categories |
+| `src/core/metadata/` | Reads ID3/Vorbis tags via `mutagen` (format-registry package); `write_comment()` saves categories |
 | `src/core/categorizer.py` | Add/remove/suggest categories; calls `write_comment` then updates library |
 | `src/core/playback.py` | Thin wrapper around `QMediaPlayer`; emits position/duration/state signals |
 | `src/ui/main_window.py` | `MainWindow` — all layout creation and signal wiring |
