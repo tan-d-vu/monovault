@@ -256,19 +256,18 @@ class MainWindow(QMainWindow):
         self.library.add_folder(folder)
         self._register_volume(folder)
         self._load_library()
-        self._scan_folder(folder)
 
     def _scan_folder(self, folder_path: str):
         tracks = self.scanner.scan_folder(folder_path)
         for track in tracks:
             self.library.add_track(track)
-        self._load_tracks()
 
     def _refresh_library(self):
         folders = self.library.get_folders()
         self.library.clear()
         for folder in folders:
             self._scan_folder(folder)
+        self._load_tracks()
         QMessageBox.information(self, "Refresh Complete", "Library has been refreshed.")
 
     def _on_folder_clicked(self, item, column):
@@ -301,7 +300,6 @@ class MainWindow(QMainWindow):
         if reply == QMessageBox.StandardButton.Yes:
             self.library.remove_folder(folder)
             self._load_library()
-            self._load_tracks()
 
     def _open_folder_in_explorer(self, folder: str):
         system = platform.system()
