@@ -2,7 +2,7 @@
 
 import logging
 from pathlib import Path
-from typing import Optional
+
 import mutagen
 
 logger = logging.getLogger(__name__)
@@ -14,7 +14,7 @@ class BaseParser:
     def can_handle(self, file_path: str) -> bool:
         return Path(file_path).suffix.lower() in self.supported_extensions
 
-    def _load_audio(self, file_path: str) -> Optional[mutagen.FileType]:
+    def _load_audio(self, file_path: str) -> mutagen.FileType | None:
         path = Path(file_path)
         if not path.exists():
             logger.warning("File not found: %s", file_path)

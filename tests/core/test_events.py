@@ -1,8 +1,9 @@
 import pytest
+
 from src.core.events import (
     EventBus,
-    TrackPlaybackStarted,
     PlaybackStateChanged,
+    TrackPlaybackStarted,
 )
 from src.models.track import Track
 

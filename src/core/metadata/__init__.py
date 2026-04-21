@@ -1,6 +1,5 @@
 """Metadata package — backward-compatible API."""
 
-from typing import Optional
 from .registry import create_default_registry
 
 _registry = create_default_registry()
@@ -46,7 +45,7 @@ def write_comments(file_path: str, comments: str) -> bool:
     return parser.write_comments(file_path, comments)
 
 
-def get_album_art(file_path: str) -> Optional[bytes]:
+def get_album_art(file_path: str) -> bytes | None:
     parser = _registry.get_parser(file_path)
     if parser is None:
         return None

@@ -1,15 +1,14 @@
 import os
 from pathlib import Path
-from typing import Optional
 
+from ..models.track import Track
 from .library_store import LibraryStore
 from .metadata import is_supported, read_comment, read_comment_raw, read_metadata
-from ..models.track import Track
 
 
 class Scanner:
     def __init__(self):
-        self.progress_callback: Optional[callable] = None
+        self.progress_callback: callable | None = None
 
     def scan_folder(self, folder_path: str) -> list[Track]:
         """Scan folder for audio files and create per-folder LibraryStore.
@@ -44,7 +43,7 @@ class Scanner:
     def _find_audio_files(self, folder: Path) -> list[str]:
         """Find all supported audio files in folder recursively."""
         audio_files = []
-        for root, dirs, files in os.walk(folder):
+        for root, _dirs, files in os.walk(folder):
             for filename in files:
                 file_path = os.path.join(root, filename)
                 if is_supported(file_path):
@@ -55,8 +54,8 @@ class Scanner:
         self,
         file_path: str,
         folder_path: str,
-        store: Optional[LibraryStore] = None,
-    ) -> Optional[Track]:
+        store: LibraryStore | None = None,
+    ) -> Track | None:
         """Process a single audio file.
 
         Args:

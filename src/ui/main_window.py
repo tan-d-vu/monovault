@@ -1,44 +1,44 @@
 import os
-import sys
-import subprocess
 import platform
+import subprocess
+import sys
 
+from PyQt6.QtCore import QEvent, Qt, QUrl
+from PyQt6.QtGui import QDesktopServices
 from PyQt6.QtWidgets import (
     QApplication,
-    QMainWindow,
-    QWidget,
-    QVBoxLayout,
-    QHBoxLayout,
-    QSplitter,
     QFileDialog,
-    QMessageBox,
+    QHBoxLayout,
+    QMainWindow,
     QMenu,
+    QMessageBox,
+    QSplitter,
+    QVBoxLayout,
+    QWidget,
 )
-from PyQt6.QtCore import Qt, QEvent, QUrl
-from PyQt6.QtGui import QDesktopServices
 
-from .styles import STYLESHEET
-from .panels import (
-    create_folder_panel,
-    create_track_table,
-    create_details_panel,
-    create_playback_bar,
-    update_play_icon,
-    update_track_details_ui,
-    update_categories,
-    update_suggestions,
-    populate_folder_tree,
-    get_folder_width,
-)
-from ..core.library import LibraryManager
-from ..core.scanner import Scanner
-from ..core.playback import PlaybackEngine
 from ..core.categorizer import Categorizer
 from ..core.category_sources import ArtistCategorySource, SimilarCategoryCategorySource
 from ..core.events import EventBus
+from ..core.library import LibraryManager
+from ..core.playback import PlaybackEngine
+from ..core.scanner import Scanner
 from ..core.volume_utils import ensure_volume_id, find_volume_by_id
 from ..models.track import Track
-from .controllers import PlaybackController, SearchController, CategoryController
+from .controllers import CategoryController, PlaybackController, SearchController
+from .panels import (
+    create_details_panel,
+    create_folder_panel,
+    create_playback_bar,
+    create_track_table,
+    get_folder_width,
+    populate_folder_tree,
+    update_categories,
+    update_play_icon,
+    update_suggestions,
+    update_track_details_ui,
+)
+from .styles import STYLESHEET
 
 
 class MainWindow(QMainWindow):
@@ -57,13 +57,9 @@ class MainWindow(QMainWindow):
             ],
         )
 
-        self.playback_ctrl = PlaybackController(
-            self.playback_engine, bus=self._bus, parent=self
-        )
+        self.playback_ctrl = PlaybackController(self.playback_engine, bus=self._bus, parent=self)
         self.search_ctrl = SearchController(self.library, bus=self._bus, parent=self)
-        self.category_ctrl = CategoryController(
-            self.categorizer, bus=self._bus, parent=self
-        )
+        self.category_ctrl = CategoryController(self.categorizer, bus=self._bus, parent=self)
 
         self.all_tracks: list[Track] = []
 
@@ -141,9 +137,7 @@ class MainWindow(QMainWindow):
         self.add_folder_btn.clicked.connect(self._add_folder)
         self.refresh_btn.clicked.connect(self._refresh_library)
         self.folder_tree_widget.itemClicked.connect(self._on_folder_clicked)
-        self.folder_tree_widget.customContextMenuRequested.connect(
-            self._on_folder_context_menu
-        )
+        self.folder_tree_widget.customContextMenuRequested.connect(self._on_folder_context_menu)
         self.search_input.textChanged.connect(self.search_ctrl.on_text_changed)
         self.track_table_widget.itemDoubleClicked.connect(self._on_track_double_clicked)
         self.track_table_widget.itemSelectionChanged.connect(self._on_track_selected)
@@ -154,9 +148,7 @@ class MainWindow(QMainWindow):
         self.playback_ctrl.now_playing_changed.connect(self.now_playing_label.setText)
         self.playback_ctrl.play_state_changed.connect(self._update_play_icon)
         self.playback_ctrl.time_display_changed.connect(self.time_label.setText)
-        self.playback_ctrl.slider_position_changed.connect(
-            self.position_slider.setValue
-        )
+        self.playback_ctrl.slider_position_changed.connect(self.position_slider.setValue)
 
         self.play_btn.clicked.connect(self.playback_ctrl.toggle_playback)
         self.position_slider.sliderMoved.connect(self.playback_ctrl.seek)
@@ -335,9 +327,7 @@ class MainWindow(QMainWindow):
                 self.category_ctrl.select_track(track)
                 # Set the track in playback controller so play button works for default selected track on app start
                 if self.playback_ctrl.current_track is None:
-                    self.now_playing_label.setText(
-                        "{} - {}".format(track.title, track.artist)
-                    )
+                    self.now_playing_label.setText(f"{track.title} - {track.artist}")
                     self.playback_ctrl.set_current_track(track)
 
     def _update_play_icon(self, is_playing: bool):

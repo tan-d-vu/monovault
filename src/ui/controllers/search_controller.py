@@ -1,6 +1,5 @@
 """Search controller — debounced search with result set management."""
 
-from typing import Optional
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
 from ...core.events import EventBus
@@ -16,9 +15,9 @@ class SearchController(QObject):
     def __init__(
         self,
         repository: ITrackRepository,
-        bus: Optional[EventBus] = None,
+        bus: EventBus | None = None,
         debounce_ms: int = 0,
-        parent: Optional[QObject] = None,
+        parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
         self._repo = repository
@@ -53,6 +52,4 @@ class SearchController(QObject):
         if self._bus:
             from ...core.events import SearchResultsChanged
 
-            self._bus.publish(
-                SearchResultsChanged(tracks=results, query=self._pending_query)
-            )
+            self._bus.publish(SearchResultsChanged(tracks=results, query=self._pending_query))

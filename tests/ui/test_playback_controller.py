@@ -1,8 +1,9 @@
-import pytest
 from unittest.mock import MagicMock
 
-from src.ui.controllers.playback_controller import PlaybackController
+import pytest
+
 from src.models.track import Track
+from src.ui.controllers.playback_controller import PlaybackController
 
 
 @pytest.mark.unit

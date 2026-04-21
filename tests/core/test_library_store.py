@@ -118,9 +118,7 @@ def test_to_key_relative_path_posix():
         key = store._to_key(file_path)
 
         # Should use forward slashes (POSIX)
-        assert "/" in key or key.count(key[0]) == len(
-            key
-        )  # Either has / or is single segment
+        assert "/" in key or key.count(key[0]) == len(key)  # Either has / or is single segment
         assert "\\" not in key  # No backslashes
         # Should be relative (not absolute)
         assert not key.startswith("/")

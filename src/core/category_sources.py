@@ -1,6 +1,7 @@
 """Pluggable category suggestion sources implementing ICategorySource."""
 
 import logging
+
 from ..models.track import Track
 from .interfaces import ITrackRepository
 

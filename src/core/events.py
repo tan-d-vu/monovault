@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 from ..models.track import Track
 
@@ -89,16 +89,12 @@ class EventBus:
     def __init__(self) -> None:
         self._subscribers: dict[type[Event], list[Callable[[Event], None]]] = {}
 
-    def subscribe(
-        self, event_type: type[Event], handler: Callable[[Event], None]
-    ) -> None:
+    def subscribe(self, event_type: type[Event], handler: Callable[[Event], None]) -> None:
         if event_type not in self._subscribers:
             self._subscribers[event_type] = []
         self._subscribers[event_type].append(handler)
 
-    def unsubscribe(
-        self, event_type: type[Event], handler: Callable[[Event], None]
-    ) -> None:
+    def unsubscribe(self, event_type: type[Event], handler: Callable[[Event], None]) -> None:
         if event_type in self._subscribers:
             try:
                 self._subscribers[event_type].remove(handler)

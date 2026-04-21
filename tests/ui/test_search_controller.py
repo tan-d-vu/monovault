@@ -1,8 +1,9 @@
-import pytest
 from unittest.mock import MagicMock
 
-from src.ui.controllers.search_controller import SearchController
+import pytest
+
 from src.models.track import Track
+from src.ui.controllers.search_controller import SearchController
 
 
 @pytest.mark.unit

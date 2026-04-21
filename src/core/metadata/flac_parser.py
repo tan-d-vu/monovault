@@ -2,9 +2,10 @@
 
 import logging
 from pathlib import Path
-from typing import Optional
+
 import mutagen
 from mutagen.flac import FLAC
+
 from .base import BaseParser
 
 logger = logging.getLogger(__name__)
@@ -33,23 +34,17 @@ class FlacParser(BaseParser):
 
             if isinstance(audio, FLAC):
                 try:
-                    metadata["title"] = (
-                        audio.get("title", [""])[0] if audio.get("title") else ""
-                    )
+                    metadata["title"] = audio.get("title", [""])[0] if audio.get("title") else ""
                 except (IndexError, TypeError, AttributeError) as e:
                     logger.error("Error reading title tag for %s: %s", file_path, e)
 
                 try:
-                    metadata["artist"] = (
-                        audio.get("artist", [""])[0] if audio.get("artist") else ""
-                    )
+                    metadata["artist"] = audio.get("artist", [""])[0] if audio.get("artist") else ""
                 except (IndexError, TypeError, AttributeError) as e:
                     logger.error("Error reading artist tag for %s: %s", file_path, e)
 
                 try:
-                    metadata["album"] = (
-                        audio.get("album", [""])[0] if audio.get("album") else ""
-                    )
+                    metadata["album"] = audio.get("album", [""])[0] if audio.get("album") else ""
                 except (IndexError, TypeError, AttributeError) as e:
                     logger.error("Error reading album tag for %s: %s", file_path, e)
 
@@ -66,27 +61,21 @@ class FlacParser(BaseParser):
             if hasattr(audio, "tags") and audio.tags:
                 try:
                     metadata["title"] = (
-                        str(audio.tags.get("title", [""])[0])
-                        if audio.tags.get("title")
-                        else ""
+                        str(audio.tags.get("title", [""])[0]) if audio.tags.get("title") else ""
                     )
                 except (IndexError, TypeError, AttributeError) as e:
                     logger.error("Error reading title tag for %s: %s", file_path, e)
 
                 try:
                     metadata["artist"] = (
-                        str(audio.tags.get("artist", [""])[0])
-                        if audio.tags.get("artist")
-                        else ""
+                        str(audio.tags.get("artist", [""])[0]) if audio.tags.get("artist") else ""
                     )
                 except (IndexError, TypeError, AttributeError) as e:
                     logger.error("Error reading artist tag for %s: %s", file_path, e)
 
                 try:
                     metadata["album"] = (
-                        str(audio.tags.get("album", [""])[0])
-                        if audio.tags.get("album")
-                        else ""
+                        str(audio.tags.get("album", [""])[0]) if audio.tags.get("album") else ""
                     )
                 except (IndexError, TypeError, AttributeError) as e:
                     logger.error("Error reading album tag for %s: %s", file_path, e)
@@ -159,9 +148,7 @@ class FlacParser(BaseParser):
                     if text:
                         return text
                 except (IndexError, TypeError, AttributeError) as e:
-                    logger.error(
-                        "Error parsing COMMENT tag (raw) for %s: %s", file_path, e
-                    )
+                    logger.error("Error parsing COMMENT tag (raw) for %s: %s", file_path, e)
 
             return ""
         except mutagen.MutagenError as e:
@@ -209,7 +196,7 @@ class FlacParser(BaseParser):
             logger.error("Error writing comments for %s: %s", file_path, e)
             return False
 
-    def get_album_art(self, file_path: str) -> Optional[bytes]:
+    def get_album_art(self, file_path: str) -> bytes | None:
         try:
             audio = mutagen.File(file_path)
             if audio is None:

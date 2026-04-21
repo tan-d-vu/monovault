@@ -5,7 +5,7 @@ Code depending on core services should type-hint against these protocols, not
 against concrete classes, to enable easy swapping and testing.
 """
 
-from typing import Optional, Protocol
+from typing import Protocol
 
 from ..models.track import Track
 
@@ -38,7 +38,7 @@ class IMetadataParser(Protocol):
         """Write raw comment string. Returns True on success."""
         ...
 
-    def get_album_art(self, file_path: str) -> Optional[bytes]:
+    def get_album_art(self, file_path: str) -> bytes | None:
         """Extract album art bytes, or None."""
         ...
 
@@ -58,11 +58,11 @@ class ITrackRepository(Protocol):
         """Return all tracks."""
         ...
 
-    def get_track_by_id(self, track_id: int) -> Optional[Track]:
+    def get_track_by_id(self, track_id: int) -> Track | None:
         """Return a track by ID, or None."""
         ...
 
-    def get_track_by_path(self, file_path: str) -> Optional[Track]:
+    def get_track_by_path(self, file_path: str) -> Track | None:
         """Return a track by file path, or None."""
         ...
 

@@ -1,6 +1,5 @@
 """Playback controller — manages playback state, track navigation, seeking."""
 
-from typing import Optional
 from PyQt6.QtCore import QObject, pyqtSignal
 
 from ...core.events import EventBus
@@ -20,13 +19,13 @@ class PlaybackController(QObject):
     def __init__(
         self,
         engine: PlaybackEngine,
-        bus: Optional[EventBus] = None,
-        parent: Optional[QObject] = None,
+        bus: EventBus | None = None,
+        parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
         self._engine = engine
         self._bus = bus
-        self._current_track: Optional[Track] = None
+        self._current_track: Track | None = None
         self._track_list: list[Track] = []
         self._is_seeking = False
 
@@ -35,7 +34,7 @@ class PlaybackController(QObject):
         self._engine.playback_state_changed.connect(self._on_playback_state_changed)
 
     @property
-    def current_track(self) -> Optional[Track]:
+    def current_track(self) -> Track | None:
         return self._current_track
 
     @property
@@ -54,7 +53,7 @@ class PlaybackController(QObject):
         self._engine.load_track(track.file_path)
         self._engine.play()
         self.play_state_changed.emit(True)
-        self.now_playing_changed.emit("{} - {}".format(track.title, track.artist))
+        self.now_playing_changed.emit(f"{track.title} - {track.artist}")
 
         if self._bus:
             from ...core.events import TrackPlaybackStarted
@@ -114,7 +113,7 @@ class PlaybackController(QObject):
 
             self._bus.publish(PlaybackStopped())
 
-    def _find_current_index(self) -> Optional[int]:
+    def _find_current_index(self) -> int | None:
         if not self._current_track:
             return None
         for i, t in enumerate(self._track_list):
@@ -149,6 +148,4 @@ class PlaybackController(QObject):
     def _format_time(position_ms: int, duration_ms: int) -> str:
         pos_s = position_ms // 1000
         dur_s = duration_ms // 1000
-        return (
-            f"{pos_s // 60:02d}:{pos_s % 60:02d} / {dur_s // 60:02d}:{dur_s % 60:02d}"
-        )
+        return f"{pos_s // 60:02d}:{pos_s % 60:02d} / {dur_s // 60:02d}:{dur_s % 60:02d}"

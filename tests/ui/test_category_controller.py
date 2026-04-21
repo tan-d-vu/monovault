@@ -1,8 +1,9 @@
-import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
-from src.ui.controllers.category_controller import CategoryController
+import pytest
+
 from src.models.track import Track
+from src.ui.controllers.category_controller import CategoryController
 
 
 def make_track(categories=None):

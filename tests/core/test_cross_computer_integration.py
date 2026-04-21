@@ -134,7 +134,7 @@ class TestNewFilesUpdatingLibrary:
             new_dates[str(file_path)] = str(file_path)
 
         store2 = LibraryStore(base_dir=flash_drive)
-        for file_path in new_dates.keys():
+        for file_path in new_dates:
             date_added = store2.record_if_new(file_path)
             new_dates[file_path] = date_added
         store2.save()
@@ -181,8 +181,7 @@ class TestNewFilesUpdatingLibrary:
         for file_path, original_date in original_data.items():
             stored_date = store3.get(file_path)
             assert stored_date == original_date, (
-                f"Original date for {file_path} was overwritten: "
-                f"{original_date} → {stored_date}"
+                f"Original date for {file_path} was overwritten: {original_date} → {stored_date}"
             )
 
     def test_library_json_accumulates_entries(self, tmp_path):
@@ -247,9 +246,7 @@ class TestReadOnlyMountRejection:
 
             # Mock QFileDialog to return read-only folder
             mock_get_dir = MagicMock(return_value=str(readonly_folder))
-            monkeypatch.setattr(
-                "src.ui.main_window.QFileDialog.getExistingDirectory", mock_get_dir
-            )
+            monkeypatch.setattr("src.ui.main_window.QFileDialog.getExistingDirectory", mock_get_dir)
 
             # Mock warning message box
             mock_warning = MagicMock()
@@ -281,9 +278,7 @@ class TestReadOnlyMountRejection:
 
             # Mock QFileDialog to return read-only folder
             mock_get_dir = MagicMock(return_value=str(readonly_folder))
-            monkeypatch.setattr(
-                "src.ui.main_window.QFileDialog.getExistingDirectory", mock_get_dir
-            )
+            monkeypatch.setattr("src.ui.main_window.QFileDialog.getExistingDirectory", mock_get_dir)
 
             # Mock warning message box
             mock_warning = MagicMock()

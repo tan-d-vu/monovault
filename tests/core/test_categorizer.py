@@ -1,6 +1,7 @@
 """Tests for Categorizer with pluggable sources."""
 
 from unittest.mock import MagicMock
+
 from src.core.categorizer import Categorizer
 from src.models.track import Track
 

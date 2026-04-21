@@ -65,9 +65,7 @@ class TestLibraryManager:
         """Adding a track with the same file_path updates in place, no duplicate."""
         first_id = library.add_track(sample_track)
 
-        updated = make_track(
-            track_id=99, file_path=sample_track.file_path, title="Updated Title"
-        )
+        updated = make_track(track_id=99, file_path=sample_track.file_path, title="Updated Title")
         second_id = library.add_track(updated)
 
         assert second_id == first_id
@@ -75,9 +73,7 @@ class TestLibraryManager:
         assert library.get_track_by_id(first_id).title == "Updated Title"  # type: ignore[union-attr]
 
     @pytest.mark.unit
-    def test_add_multiple_tracks_get_distinct_ids(
-        self, library: LibraryManager
-    ) -> None:
+    def test_add_multiple_tracks_get_distinct_ids(self, library: LibraryManager) -> None:
         id1 = library.add_track(make_track(file_path="/tmp/a.mp3"))
         id2 = library.add_track(make_track(file_path="/tmp/b.mp3"))
         assert id1 != id2
@@ -88,9 +84,7 @@ class TestLibraryManager:
     # ------------------------------------------------------------------
 
     @pytest.mark.unit
-    def test_get_track_by_id_found(
-        self, library: LibraryManager, sample_track: Track
-    ) -> None:
+    def test_get_track_by_id_found(self, library: LibraryManager, sample_track: Track) -> None:
         track_id = library.add_track(sample_track)
         result = library.get_track_by_id(track_id)
         assert result is not None
@@ -105,9 +99,7 @@ class TestLibraryManager:
     # ------------------------------------------------------------------
 
     @pytest.mark.unit
-    def test_get_track_by_path_found(
-        self, library: LibraryManager, sample_track: Track
-    ) -> None:
+    def test_get_track_by_path_found(self, library: LibraryManager, sample_track: Track) -> None:
         library.add_track(sample_track)
         result = library.get_track_by_path(sample_track.file_path)
         assert result is not None
@@ -169,42 +161,32 @@ class TestLibraryManager:
     # ------------------------------------------------------------------
 
     @pytest.mark.unit
-    def test_search_by_title(
-        self, library: LibraryManager, sample_track: Track
-    ) -> None:
+    def test_search_by_title(self, library: LibraryManager, sample_track: Track) -> None:
         library.add_track(sample_track)
         results = library.search("Test Song")
         assert len(results) == 1
         assert results[0].title == sample_track.title
 
     @pytest.mark.unit
-    def test_search_by_artist(
-        self, library: LibraryManager, sample_track: Track
-    ) -> None:
+    def test_search_by_artist(self, library: LibraryManager, sample_track: Track) -> None:
         library.add_track(sample_track)
         results = library.search("Test Artist")
         assert any(t.artist == "Test Artist" for t in results)
 
     @pytest.mark.unit
-    def test_search_by_category(
-        self, library: LibraryManager, sample_track: Track
-    ) -> None:
+    def test_search_by_category(self, library: LibraryManager, sample_track: Track) -> None:
         library.add_track(sample_track)
         results = library.search("rock")
         assert len(results) >= 1
 
     @pytest.mark.unit
-    def test_search_case_insensitive(
-        self, library: LibraryManager, sample_track: Track
-    ) -> None:
+    def test_search_case_insensitive(self, library: LibraryManager, sample_track: Track) -> None:
         library.add_track(sample_track)
         results = library.search("TEST SONG")
         assert len(results) == 1
 
     @pytest.mark.unit
-    def test_search_no_results(
-        self, library: LibraryManager, sample_track: Track
-    ) -> None:
+    def test_search_no_results(self, library: LibraryManager, sample_track: Track) -> None:
         library.add_track(sample_track)
         results = library.search("zzznomatch999")
         assert results == []
@@ -214,9 +196,7 @@ class TestLibraryManager:
     # ------------------------------------------------------------------
 
     @pytest.mark.unit
-    def test_get_tracks_by_artist_found(
-        self, library: LibraryManager, sample_track: Track
-    ) -> None:
+    def test_get_tracks_by_artist_found(self, library: LibraryManager, sample_track: Track) -> None:
         library.add_track(sample_track)
         results = library.get_tracks_by_artist("Test Artist")
         assert len(results) == 1

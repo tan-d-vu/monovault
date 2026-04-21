@@ -1,33 +1,34 @@
 """UI panels — folder tree, track table, details panel, playback bar."""
 
-from PyQt6.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
-    QHBoxLayout,
-    QTreeWidget,
-    QTreeWidgetItem,
-    QTableWidget,
-    QLineEdit,
-    QLabel,
-    QPushButton,
-    QSlider,
-    QFrame,
-    QHeaderView,
-    QScrollArea,
-    QSizePolicy,
-    QStyle,
-)
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFontMetrics, QIcon, QPixmap, QImage
 from enum import IntEnum
 from typing import TYPE_CHECKING
+
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QFontMetrics, QIcon, QImage, QPixmap
+from PyQt6.QtWidgets import (
+    QFrame,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QScrollArea,
+    QSizePolicy,
+    QSlider,
+    QStyle,
+    QTableWidget,
+    QTreeWidget,
+    QTreeWidgetItem,
+    QVBoxLayout,
+    QWidget,
+)
 
 if TYPE_CHECKING:
     from .track_table import TrackTableManager
 
+from ..models.track import Track
 from .styles import THEME
 from .widgets import CategoryPill, SuggestionButton
-from ..models.track import Track
 
 
 class TrackTableColumn(IntEnum):
@@ -62,9 +63,7 @@ _COLUMN_RESIZE_MODES: dict[TrackTableColumn, QHeaderView.ResizeMode] = {
 }
 
 
-def create_track_table() -> tuple[
-    QWidget, QLineEdit, QTableWidget, "TrackTableManager"
-]:
+def create_track_table() -> tuple[QWidget, QLineEdit, QTableWidget, "TrackTableManager"]:
     panel = QFrame()
     panel.setFrameStyle(QFrame.Shape.NoFrame)
 
@@ -141,9 +140,7 @@ def create_details_panel() -> tuple[
 
     album_art_label = QLabel()
     album_art_label.setFixedSize(300, 300)
-    album_art_label.setStyleSheet(
-        f"background-color: {THEME['border']}; border-radius: 4px;"
-    )
+    album_art_label.setStyleSheet(f"background-color: {THEME['border']}; border-radius: 4px;")
     album_art_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
     layout.addWidget(album_art_label, 0, Qt.AlignmentFlag.AlignCenter)
 
@@ -161,16 +158,12 @@ def create_details_panel() -> tuple[
     layout.addWidget(track_date_added)
 
     categories_header = QLabel("Categories")
-    categories_header.setStyleSheet(
-        f"font-weight: bold; color: {THEME['text_secondary']};"
-    )
+    categories_header.setStyleSheet(f"font-weight: bold; color: {THEME['text_secondary']};")
     layout.addWidget(categories_header)
 
     categories_scroll = QScrollArea()
     categories_scroll.setWidgetResizable(True)
-    categories_scroll.setHorizontalScrollBarPolicy(
-        Qt.ScrollBarPolicy.ScrollBarAlwaysOff
-    )
+    categories_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
     categories_scroll.setStyleSheet("""
         QScrollArea {
             border: none;
@@ -180,9 +173,7 @@ def create_details_panel() -> tuple[
     categories_scroll.setAlignment(Qt.AlignmentFlag.AlignTop)
 
     categories_container = QWidget()
-    categories_container.setSizePolicy(
-        QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum
-    )
+    categories_container.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
     categories_layout = QVBoxLayout(categories_container)
     categories_layout.setContentsMargins(0, 0, 0, 0)
     categories_layout.setSpacing(2)
@@ -195,9 +186,7 @@ def create_details_panel() -> tuple[
     layout.addWidget(category_input)
 
     suggestions_header = QLabel("Suggested Categories")
-    suggestions_header.setStyleSheet(
-        f"font-weight: bold; color: {THEME['text_secondary']};"
-    )
+    suggestions_header.setStyleSheet(f"font-weight: bold; color: {THEME['text_secondary']};")
     layout.addWidget(suggestions_header)
 
     suggestions_container = QWidget()
@@ -222,9 +211,7 @@ def create_details_panel() -> tuple[
     )
 
 
-def create_playback_bar() -> tuple[
-    QWidget, QLabel, QPushButton, QSlider, QLabel, QSlider
-]:
+def create_playback_bar() -> tuple[QWidget, QLabel, QPushButton, QSlider, QLabel, QSlider]:
     bar = QFrame()
     bar.setFixedHeight(50)
     bar.setStyleSheet(
@@ -284,9 +271,7 @@ def create_playback_bar() -> tuple[
 def update_play_icon(play_btn: QPushButton, is_playing: bool) -> None:
     style = play_btn.style()
     std_icon = style.standardIcon(
-        QStyle.StandardPixmap.SP_MediaPause
-        if is_playing
-        else QStyle.StandardPixmap.SP_MediaPlay
+        QStyle.StandardPixmap.SP_MediaPause if is_playing else QStyle.StandardPixmap.SP_MediaPlay
     )
     pixmap = std_icon.pixmap(24, 24)
     img = pixmap.toImage()
@@ -331,9 +316,7 @@ def update_track_details_ui(
         album_art_label.clear()
 
 
-def update_categories(
-    track: Track, categories_layout: QVBoxLayout, on_remove=None
-) -> None:
+def update_categories(track: Track, categories_layout: QVBoxLayout, on_remove=None) -> None:
     while categories_layout.count():
         child = categories_layout.takeAt(0)
         if child.widget():

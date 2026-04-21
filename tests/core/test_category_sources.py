@@ -1,6 +1,7 @@
 """Tests for pluggable category suggestion sources."""
 
 from unittest.mock import MagicMock
+
 from src.core.category_sources import (
     ArtistCategorySource,
     SimilarCategoryCategorySource,

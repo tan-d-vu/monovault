@@ -1,9 +1,8 @@
 """Background worker for writing category metadata to disk."""
 
 import logging
-from typing import Optional
 
-from PyQt6.QtCore import QRunnable, QObject, pyqtSignal
+from PyQt6.QtCore import QObject, QRunnable, pyqtSignal
 
 from ...core.metadata import write_comment
 
@@ -19,7 +18,7 @@ class MetadataWriteWorker(QRunnable):
         self,
         file_path: str,
         categories: list[str],
-        signals: Optional[MetadataWriteSignals] = None,
+        signals: MetadataWriteSignals | None = None,
     ) -> None:
         super().__init__()
         self._file_path = file_path
@@ -40,7 +39,5 @@ class MetadataWriteWorker(QRunnable):
             Exception
         ) as e:  # broad catch intentional: background thread must never crash silently
             error_msg = str(e)
-            logger.error(
-                "Unexpected error writing metadata for %s: %s", self._file_path, e
-            )
+            logger.error("Unexpected error writing metadata for %s: %s", self._file_path, e)
             self.signals.finished.emit(self._file_path, False, error_msg)

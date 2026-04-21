@@ -1,5 +1,6 @@
-from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel, QPushButton, QSizePolicy
 from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QSizePolicy, QWidget
+
 from .styles import THEME
 
 
@@ -69,6 +70,4 @@ class SuggestionButton(QPushButton):
                 border-color: {THEME["accent"]};
             }}
         """)
-        self.clicked.connect(
-            lambda: self.clicked_with_source.emit(self.category, self.source)
-        )
+        self.clicked.connect(lambda: self.clicked_with_source.emit(self.category, self.source))

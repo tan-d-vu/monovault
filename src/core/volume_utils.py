@@ -6,7 +6,6 @@ import os
 import platform
 import uuid
 from pathlib import Path
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +19,7 @@ def generate_volume_id() -> str:
     return uuid.uuid4().hex
 
 
-def read_volume_id(folder: Path) -> Optional[str]:
+def read_volume_id(folder: Path) -> str | None:
     """Read volume_id from folder's .monovault sidecar.
 
     Args:
@@ -33,7 +32,7 @@ def read_volume_id(folder: Path) -> Optional[str]:
     try:
         if volume_id_file.exists():
             return volume_id_file.read_text().strip()
-    except (OSError, IOError):
+    except OSError:
         pass
     return None
 
@@ -58,7 +57,7 @@ def write_volume_id(folder: Path) -> str:
     return volume_id
 
 
-def ensure_volume_id(folder: Path) -> Optional[str]:
+def ensure_volume_id(folder: Path) -> str | None:
     """Ensure volume_id exists, creating if necessary.
 
     Reads existing volume_id. If missing, generates and writes a new one.
@@ -125,7 +124,7 @@ def get_mount_search_paths() -> list[Path]:
     return paths
 
 
-def find_volume_by_id(volume_id: str) -> Optional[Path]:
+def find_volume_by_id(volume_id: str) -> Path | None:
     """Find a volume by its volume_id.
 
     Searches all mount paths and subdirectories for a volume with matching
@@ -160,7 +159,7 @@ def find_volume_by_id(volume_id: str) -> Optional[Path]:
                     content = volume_id_file.read_text().strip()
                     if content == volume_id:
                         return item
-        except (OSError, IOError):
+        except OSError:
             # Skip inaccessible directories
             continue
 

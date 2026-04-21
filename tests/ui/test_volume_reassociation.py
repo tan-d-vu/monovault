@@ -61,6 +61,4 @@ def test_register_volume_on_add_folder():
     window._register_volume = mock_register
     window._register_volume("/test")
 
-    window.library.config.register_volume.assert_called_once_with(
-        "test_vol_id", "/test"
-    )
+    window.library.config.register_volume.assert_called_once_with("test_vol_id", "/test")

@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 
 @dataclass
@@ -12,7 +11,7 @@ class Track:
     album: str
     duration: float
     categories: list[str]
-    album_art: Optional[bytes]
+    album_art: bytes | None
     folder_path: str
     comments: str = ""
     date_added: str = ""
@@ -49,10 +48,8 @@ class Track:
         }
 
     @classmethod
-    def from_dict(cls, data: dict, album_art: Optional[bytes] = None) -> "Track":
-        categories = (
-            data.get("categories", "").split() if data.get("categories") else []
-        )
+    def from_dict(cls, data: dict, album_art: bytes | None = None) -> "Track":
+        categories = data.get("categories", "").split() if data.get("categories") else []
         return cls(
             id=data["id"],
             file_path=data["file_path"],

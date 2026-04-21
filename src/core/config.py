@@ -9,9 +9,7 @@ class Config:
         self.config_dir = self._get_config_dir()
         self.config_file = self.config_dir / "config.json"
         self.folders: list[str] = []
-        self.volumes: dict[
-            str, dict
-        ] = {}  # volume_id -> {"paths": [...], "created_at": "..."}
+        self.volumes: dict[str, dict] = {}  # volume_id -> {"paths": [...], "created_at": "..."}
         self._load()
 
     def _get_config_dir(self) -> Path:
@@ -24,11 +22,11 @@ class Config:
     def _load(self):
         if self.config_file.exists():
             try:
-                with open(self.config_file, "r", encoding="utf-8") as f:
+                with open(self.config_file, encoding="utf-8") as f:
                     data = json.load(f)
                     self.folders = data.get("folders", [])
                     self.volumes = data.get("volumes", {})
-            except (json.JSONDecodeError, IOError):
+            except (OSError, json.JSONDecodeError):
                 self.folders = []
                 self.volumes = {}
         else:

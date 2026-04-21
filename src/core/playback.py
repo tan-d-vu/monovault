@@ -1,6 +1,5 @@
-from typing import Optional
 from PyQt6.QtCore import QObject, pyqtSignal
-from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
+from PyQt6.QtMultimedia import QAudioOutput, QMediaPlayer
 
 
 class PlaybackEngine(QObject):
@@ -16,7 +15,7 @@ class PlaybackEngine(QObject):
         self.audio.setVolume(0.7)
         self.player.setAudioOutput(self.audio)
 
-        self._current_track: Optional[str] = None
+        self._current_track: str | None = None
         self._current_position: int = 0
         self._duration: int = 0
 
@@ -66,7 +65,7 @@ class PlaybackEngine(QObject):
     def is_paused(self) -> bool:
         return self.player.playbackState() == QMediaPlayer.PlaybackState.PausedState
 
-    def current_track(self) -> Optional[str]:
+    def current_track(self) -> str | None:
         return self._current_track
 
     def _on_position_changed(self, position: int):

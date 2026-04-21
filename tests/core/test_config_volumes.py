@@ -116,9 +116,7 @@ def test_register_volume_normalizes_trailing_slash():
             config.register_volume("vol_usb", f"{tmpdir}/mnt/usb")
 
             paths = config.volumes["vol_usb"]["paths"]
-            assert len(paths) == 1, (
-                "Should have only one path (trailing slash normalized)"
-            )
+            assert len(paths) == 1, "Should have only one path (trailing slash normalized)"
 
 
 @pytest.mark.unit

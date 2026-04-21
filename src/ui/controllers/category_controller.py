@@ -1,9 +1,8 @@
 """Category controller — manages category CRUD and suggestions for the selected track."""
 
 import logging
-from typing import Optional
 
-from PyQt6.QtCore import QObject, pyqtSignal, QThreadPool
+from PyQt6.QtCore import QObject, QThreadPool, pyqtSignal
 
 from ...core.categorizer import Categorizer
 from ...core.events import EventBus
@@ -24,18 +23,18 @@ class CategoryController(QObject):
     def __init__(
         self,
         categorizer: Categorizer,
-        bus: Optional[EventBus] = None,
-        parent: Optional[QObject] = None,
+        bus: EventBus | None = None,
+        parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
         self._categorizer = categorizer
         self._bus = bus
-        self._current_track: Optional[Track] = None
+        self._current_track: Track | None = None
         self._write_pool = QThreadPool(self)
         self._write_pool.setMaxThreadCount(1)
 
     @property
-    def current_track(self) -> Optional[Track]:
+    def current_track(self) -> Track | None:
         return self._current_track
 
     def select_track(self, track: Track) -> None:
@@ -69,15 +68,11 @@ class CategoryController(QObject):
     def remove_category(self, category: str) -> bool:
         if not self._current_track:
             return False
-        validated = self._categorizer.parse_remove_category(
-            self._current_track, category
-        )
+        validated = self._categorizer.parse_remove_category(self._current_track, category)
         if validated is None:
             return False
 
-        new_categories = [
-            c for c in self._current_track.categories if c.lower() != validated
-        ]
+        new_categories = [c for c in self._current_track.categories if c.lower() != validated]
         self._categorizer.apply_categories(self._current_track, new_categories)
         self.categories_changed.emit(self._current_track)
         if self._bus:

@@ -2,10 +2,10 @@
 
 import logging
 from pathlib import Path
-from typing import Optional
+
 from .base import BaseParser
-from .mp3_parser import Mp3Parser
 from .flac_parser import FlacParser
+from .mp3_parser import Mp3Parser
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +17,7 @@ class MetadataRegistry:
     def register(self, parser: BaseParser) -> None:
         self._parsers.append(parser)
 
-    def get_parser(self, file_path: str) -> Optional[BaseParser]:
+    def get_parser(self, file_path: str) -> BaseParser | None:
         for parser in self._parsers:
             if parser.can_handle(file_path):
                 return parser

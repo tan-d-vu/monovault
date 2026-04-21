@@ -3,13 +3,13 @@
 from enum import IntEnum
 from typing import Protocol
 
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
+    QAbstractItemView,
+    QHeaderView,
     QTableWidget,
     QTableWidgetItem,
-    QHeaderView,
-    QAbstractItemView,
 )
-from PyQt6.QtCore import Qt
 
 from ..models.track import Track
 
@@ -142,20 +142,14 @@ class TrackTableManager:
         self._table.setItem(row, TrackTableColumn.NUMBER, num_item)
 
         self._table.setItem(row, TrackTableColumn.TITLE, QTableWidgetItem(track.title))
-        self._table.setItem(
-            row, TrackTableColumn.ARTIST, QTableWidgetItem(track.artist)
-        )
+        self._table.setItem(row, TrackTableColumn.ARTIST, QTableWidgetItem(track.artist))
 
         dur_item = QTableWidgetItem(track.duration_formatted)
         dur_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
         self._table.setItem(row, TrackTableColumn.DURATION, dur_item)
 
-        self._table.setItem(
-            row, TrackTableColumn.COMMENTS, QTableWidgetItem(track.comments or "")
-        )
-        self._table.setItem(
-            row, TrackTableColumn.LOCATION, QTableWidgetItem(track.location)
-        )
+        self._table.setItem(row, TrackTableColumn.COMMENTS, QTableWidgetItem(track.comments or ""))
+        self._table.setItem(row, TrackTableColumn.LOCATION, QTableWidgetItem(track.location))
 
         added_item = QTableWidgetItem(track.date_added or "")
         added_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)

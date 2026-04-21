@@ -1,7 +1,5 @@
 """In-memory track store. Implements ITrackRepository."""
 
-from typing import Optional
-
 from ..models.track import Track
 from .config import Config
 
@@ -22,9 +20,7 @@ class LibraryManager:
     def remove_folder(self, path: str):
         if self.config.remove_folder(path):
             self.folders = self.config.get_folders()
-            self.tracks = {
-                tid: t for tid, t in self.tracks.items() if t.folder_path != path
-            }
+            self.tracks = {tid: t for tid, t in self.tracks.items() if t.folder_path != path}
 
     def get_folders(self) -> list[str]:
         return list(self.folders)
@@ -48,10 +44,10 @@ class LibraryManager:
     def get_all_tracks(self) -> list[Track]:
         return list(self.tracks.values())
 
-    def get_track_by_id(self, track_id: int) -> Optional[Track]:
+    def get_track_by_id(self, track_id: int) -> Track | None:
         return self.tracks.get(track_id)
 
-    def get_track_by_path(self, file_path: str) -> Optional[Track]:
+    def get_track_by_path(self, file_path: str) -> Track | None:
         for track in self.tracks.values():
             if track.file_path == file_path:
                 return track
