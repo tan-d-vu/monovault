@@ -35,11 +35,13 @@ class Categorizer:
     def parse_add_category(self, track: Track, category: str) -> str | None:
         """Normalize and validate a category for addition.
 
-        Strips whitespace, lowercases, and rejects empty or duplicate values.
-        Returns the normalized category string, or None if it should be rejected.
+        Strips whitespace, lowercases, and rejects empty, multi-word, or
+        duplicate values.
         """
         category = category.strip().lower()
         if not category:
+            return None
+        if any(c.isspace() for c in category):
             return None
         if category in [c.lower() for c in track.categories]:
             return None

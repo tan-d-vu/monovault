@@ -128,6 +128,7 @@ def create_details_panel() -> tuple[
     QLineEdit,
     QLabel,
     QLabel,
+    QLabel,
     QVBoxLayout,
     QVBoxLayout,
 ]:
@@ -186,6 +187,11 @@ def create_details_panel() -> tuple[
     category_input.setPlaceholderText("Add category...")
     layout.addWidget(category_input)
 
+    category_input_hint = QLabel("Categories must be a single word")
+    category_input_hint.setStyleSheet(f"color: {THEME['error']}; font-size: 11px;")
+    category_input_hint.hide()
+    layout.addWidget(category_input_hint)
+
     suggestions_header = QLabel("Suggested Categories")
     suggestions_header.setStyleSheet(f"font-weight: bold; color: {THEME['text_secondary']};")
     layout.addWidget(suggestions_header)
@@ -205,6 +211,7 @@ def create_details_panel() -> tuple[
         track_info,
         track_date_added,
         category_input,
+        category_input_hint,
         suggestions_header,
         suggestions_container,
         categories_layout,

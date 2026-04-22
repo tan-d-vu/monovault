@@ -41,6 +41,7 @@ from .panels import (
 )
 from .scanner_worker import ScannerWorker
 from .styles import STYLESHEET
+from .widgets import Toast
 
 
 class MainWindow(QMainWindow):
@@ -105,6 +106,7 @@ class MainWindow(QMainWindow):
             self.track_info,
             self.track_date_added,
             self.category_input,
+            self.category_input_hint,
             self.suggestions_header,
             self.suggestions_container,
             self.categories_layout,
@@ -149,6 +151,8 @@ class MainWindow(QMainWindow):
         overall_layout.addWidget(self.playback_bar)
         self.setCentralWidget(overall)
 
+        self.toast = Toast(self)
+
         self.add_folder_btn.clicked.connect(self._add_folder)
         self.refresh_btn.clicked.connect(self._refresh_library)
         self.folder_tree_widget.customContextMenuRequested.connect(self._on_folder_context_menu)
@@ -157,6 +161,7 @@ class MainWindow(QMainWindow):
         self.track_table_widget.itemSelectionChanged.connect(self._on_track_selected)
         self.track_table_widget.installEventFilter(self)
         self.category_input.returnPressed.connect(self._on_add_category_input)
+        self.category_input.textChanged.connect(self._on_category_input_changed)
         self.scan_cancel_btn.clicked.connect(self._on_scan_cancel_clicked)
 
     def _connect_controllers(self):
@@ -182,8 +187,8 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence("Ctrl+O"), self).activated.connect(self._add_folder)
 
     def _on_write_failed(self, file_path: str, msg: str) -> None:
-        self.statusBar().showMessage(
-            f"Failed to save categories for {os.path.basename(file_path)}: {msg}", 5000
+        self.toast.show_message(
+            f"Failed to save categories for {os.path.basename(file_path)}: {msg}"
         )
 
     def _load_library(self):
@@ -429,10 +434,19 @@ class MainWindow(QMainWindow):
         update_play_icon(self.play_btn, is_playing)
 
     def _on_add_category_input(self):
-        category = self.category_input.text().strip()
-        if category:
-            self.category_ctrl.add_category(category)
-            self.category_input.clear()
+        raw = self.category_input.text().strip()
+        if not raw:
+            return
+        if any(c.isspace() for c in raw):
+            self.category_input_hint.show()
+            return
+        self.category_input_hint.hide()
+        self.category_ctrl.add_category(raw)
+        self.category_input.clear()
+
+    def _on_category_input_changed(self, _text: str) -> None:
+        if self.category_input_hint.isVisible():
+            self.category_input_hint.hide()
 
     def _on_categories_changed(self, track: Track) -> None:
         update_categories(track, self.categories_layout, self._on_remove_category)

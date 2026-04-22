@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -176,6 +176,47 @@ class TestCategoryController:
         result = ctrl.clear_categories()
 
         assert result is False
+
+    def test_write_failure_reverts_to_disk_state(self, qapp):
+        categorizer = MagicMock()
+        categorizer.apply_categories.return_value = None
+        categorizer.get_suggestions.return_value = []
+
+        track = make_track(categories=["rock", "jazz"])
+
+        ctrl = make_ctrl(categorizer)
+        ctrl.select_track(track)
+
+        failures = []
+        ctrl.write_failed.connect(lambda path, msg: failures.append((path, msg)))
+
+        with patch(
+            "src.ui.controllers.category_controller.read_comment",
+            return_value=["rock"],
+        ):
+            ctrl._on_write_finished(track.file_path, False, "disk full")
+
+        assert failures == [(track.file_path, "disk full")]
+        categorizer.apply_categories.assert_called_with(track, ["rock"])
+
+    def test_write_failure_for_other_track_is_ignored(self, qapp):
+        categorizer = MagicMock()
+        categorizer.apply_categories.return_value = None
+        categorizer.get_suggestions.return_value = []
+
+        track = make_track()
+
+        ctrl = make_ctrl(categorizer)
+        ctrl.select_track(track)
+
+        # Reset apply_categories call history from select_track path.
+        categorizer.apply_categories.reset_mock()
+
+        with patch("src.ui.controllers.category_controller.read_comment") as mock_read:
+            ctrl._on_write_finished("/tmp/other.mp3", False, "boom")
+
+        mock_read.assert_not_called()
+        categorizer.apply_categories.assert_not_called()
 
     def test_write_failed_signal_emitted_on_error(self, qapp):
         categorizer = MagicMock()

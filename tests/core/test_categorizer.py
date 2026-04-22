@@ -96,6 +96,13 @@ class TestCategorizerParseAddCategory:
         track = make_track(categories=["ROCK"])
         assert categorizer.parse_add_category(track, "rock") is None
 
+    def test_rejects_internal_whitespace(self):
+        library = MagicMock()
+        categorizer = Categorizer(library)
+        track = make_track()
+        assert categorizer.parse_add_category(track, "classical music") is None
+        assert categorizer.parse_add_category(track, "a\tb") is None
+
 
 class TestCategorizerParseRemoveCategory:
     def test_returns_lowercased_match(self):

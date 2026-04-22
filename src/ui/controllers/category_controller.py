@@ -6,6 +6,7 @@ from PyQt6.QtCore import QObject, QThreadPool, pyqtSignal
 
 from ...core.categorizer import Categorizer
 from ...core.events import EventBus
+from ...core.metadata import read_comment
 from ...models.track import Track
 from ..workers.metadata_worker import MetadataWriteWorker
 
@@ -108,10 +109,30 @@ class CategoryController(QObject):
     def _on_write_finished(self, file_path: str, success: bool, error_msg: str) -> None:
         if success:
             logger.debug("Successfully wrote metadata for %s", file_path)
-        else:
-            msg = error_msg or "Unknown error"
-            logger.warning("Failed to write metadata for %s: %s", file_path, msg)
-            self.write_failed.emit(file_path, msg)
+            return
+        msg = error_msg or "Unknown error"
+        logger.warning("Failed to write metadata for %s: %s", file_path, msg)
+        self._revert_from_disk(file_path)
+        self.write_failed.emit(file_path, msg)
+
+    def _revert_from_disk(self, file_path: str) -> None:
+        track = self._find_track_by_path(file_path)
+        if track is None:
+            return
+        ground_truth = read_comment(file_path)
+        self._categorizer.apply_categories(track, ground_truth)
+        self.categories_changed.emit(track)
+        if self._bus:
+            from ...core.events import CategoriesChanged
+
+            self._bus.publish(CategoriesChanged(track=track))
+        if track is self._current_track:
+            self._refresh_suggestions()
+
+    def _find_track_by_path(self, file_path: str) -> Track | None:
+        if self._current_track and self._current_track.file_path == file_path:
+            return self._current_track
+        return None
 
     def shutdown(self) -> None:
         # Cancel pending-but-not-started workers, then drain running ones.

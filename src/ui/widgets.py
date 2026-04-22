@@ -1,4 +1,4 @@
-from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QSizePolicy, QWidget
 
 from .styles import THEME
@@ -71,3 +71,44 @@ class SuggestionButton(QPushButton):
             }}
         """)
         self.clicked.connect(lambda: self.clicked_with_source.emit(self.category, self.source))
+
+
+class Toast(QLabel):
+    DEFAULT_DURATION_MS = 4000
+    MARGIN = 16
+
+    def __init__(self, parent: QWidget):
+        super().__init__(parent)
+        self.setWordWrap(True)
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.setStyleSheet(f"""
+            QLabel {{
+                background-color: {THEME["secondary_bg"]};
+                color: {THEME["text_primary"]};
+                border: 1px solid {THEME["error"]};
+                border-radius: 6px;
+                padding: 10px 14px;
+            }}
+        """)
+        self.setMinimumWidth(240)
+        self.setMaximumWidth(360)
+        self.hide()
+        self._timer = QTimer(self)
+        self._timer.setSingleShot(True)
+        self._timer.timeout.connect(self.hide)
+
+    def show_message(self, text: str, duration_ms: int = DEFAULT_DURATION_MS) -> None:
+        self.setText(text)
+        self.adjustSize()
+        self._reposition()
+        self.raise_()
+        self.show()
+        self._timer.start(duration_ms)
+
+    def _reposition(self) -> None:
+        parent = self.parentWidget()
+        if parent is None:
+            return
+        x = parent.width() - self.width() - self.MARGIN
+        y = parent.height() - self.height() - self.MARGIN
+        self.move(max(self.MARGIN, x), max(self.MARGIN, y))
