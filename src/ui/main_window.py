@@ -432,7 +432,7 @@ class MainWindow(QMainWindow):
 
     def _on_categories_changed(self, track: Track) -> None:
         update_categories(track, self.categories_layout, self._on_remove_category)
-        self._refresh_track_in_table(track)
+        self.track_table_manager.update_track(track)
 
     def _on_remove_category(self, category: str) -> None:
         self.category_ctrl.remove_category(category)
@@ -457,18 +457,6 @@ class MainWindow(QMainWindow):
 
     def _on_suggestion_clicked(self, category: str, source: str):
         self.category_ctrl.accept_suggestion(category)
-
-    def _refresh_track_in_table(self, track: Track):
-        for i in range(self.track_table_widget.rowCount()):
-            item = self.track_table_widget.item(i, 0)
-            stored = item.data(Qt.ItemDataRole.UserRole) if item else None
-            if stored and stored.id == track.id:
-                self.track_table_widget.item(i, 4).setText(" ".join(track.categories))
-                for col in range(6):
-                    item = self.track_table_widget.item(i, col)
-                    if item:
-                        item.setData(Qt.ItemDataRole.UserRole, track)
-                break
 
     def closeEvent(self, event):
         if self._scan_worker is not None:

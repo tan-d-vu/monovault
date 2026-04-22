@@ -80,6 +80,7 @@ class TrackTableManager:
         self._last_tracks: list[Track] = []
         self._sort_column: int | None = None
         self._sort_order: Qt.SortOrder | None = None
+        self._row_by_track_id: dict[int, int] = {}
         self._setup_table()
 
     def _setup_table(self) -> None:
@@ -106,18 +107,17 @@ class TrackTableManager:
     def _on_header_clicked(self, col: int) -> None:
         header = self._header
         if self._sort_column != col:
-            # New column: sort ascending
             self._sort_column = col
             self._sort_order = Qt.SortOrder.AscendingOrder
             self._table.sortItems(col, Qt.SortOrder.AscendingOrder)
             header.setSortIndicator(col, Qt.SortOrder.AscendingOrder)
+            self._rebuild_row_map()
         elif self._sort_order == Qt.SortOrder.AscendingOrder:
-            # Same column, ascending → descending
             self._sort_order = Qt.SortOrder.DescendingOrder
             self._table.sortItems(col, Qt.SortOrder.DescendingOrder)
             header.setSortIndicator(col, Qt.SortOrder.DescendingOrder)
+            self._rebuild_row_map()
         else:
-            # Same column, descending → clear sort, restore original order
             self._sort_column = None
             self._sort_order = None
             header.setSortIndicator(-1, Qt.SortOrder.AscendingOrder)
@@ -127,6 +127,7 @@ class TrackTableManager:
         self._last_tracks = tracks
         self._sort_column = None
         self._sort_order = None
+        self._row_by_track_id.clear()
         self._header.setSortIndicator(-1, Qt.SortOrder.AscendingOrder)
         self._table.setRowCount(len(tracks))
         self._populate_rows(tracks)
@@ -135,6 +136,30 @@ class TrackTableManager:
     def _populate_rows(self, tracks: list[Track]) -> None:
         for i, track in enumerate(tracks):
             self._set_row(i, track)
+        self._rebuild_row_map()
+
+    def _rebuild_row_map(self) -> None:
+        self._row_by_track_id.clear()
+        for row in range(self._table.rowCount()):
+            item = self._table.item(row, TrackTableColumn.NUMBER)
+            if item is None:
+                continue
+            track = item.data(Qt.ItemDataRole.UserRole)
+            if track is not None:
+                self._row_by_track_id[track.id] = row
+
+    def update_track(self, track: Track) -> bool:
+        row = self._row_by_track_id.get(track.id)
+        if row is None:
+            return False
+        comments_item = self._table.item(row, TrackTableColumn.COMMENTS)
+        if comments_item is not None:
+            comments_item.setText(" ".join(track.categories))
+        for col in range(TrackTableColumn.COUNT):
+            item = self._table.item(row, col)
+            if item is not None:
+                item.setData(Qt.ItemDataRole.UserRole, track)
+        return True
 
     def _set_row(self, row: int, track: Track) -> None:
         num_item = _NumericItem(str(row + 1))
@@ -164,6 +189,8 @@ class TrackTableManager:
             if item:
                 item.setData(Qt.ItemDataRole.UserRole, track)
 
+        self._row_by_track_id[track.id] = row
+
     def _calculate_column_widths(self, tracks: list[Track]) -> None:
         header_fm = self._header.fontMetrics()
         content_fm = self._header.fontMetrics()
@@ -186,3 +213,4 @@ class TrackTableManager:
 
     def clear(self) -> None:
         self._table.setRowCount(0)
+        self._row_by_track_id.clear()
