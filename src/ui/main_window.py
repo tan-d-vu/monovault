@@ -4,7 +4,7 @@ import subprocess
 import sys
 
 from PyQt6.QtCore import QEvent, Qt, QThread, QUrl
-from PyQt6.QtGui import QDesktopServices
+from PyQt6.QtGui import QDesktopServices, QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
     QApplication,
     QFileDialog,
@@ -71,6 +71,7 @@ class MainWindow(QMainWindow):
 
         self._setup_ui()
         self._connect_controllers()
+        self._connect_shortcuts()
         self._load_library()
         self.statusBar().showMessage("Ready")
 
@@ -150,7 +151,6 @@ class MainWindow(QMainWindow):
 
         self.add_folder_btn.clicked.connect(self._add_folder)
         self.refresh_btn.clicked.connect(self._refresh_library)
-        self.folder_tree_widget.itemClicked.connect(self._on_folder_clicked)
         self.folder_tree_widget.customContextMenuRequested.connect(self._on_folder_context_menu)
         self.search_input.textChanged.connect(self.search_ctrl.on_text_changed)
         self.track_table_widget.itemDoubleClicked.connect(self._on_track_double_clicked)
@@ -175,6 +175,11 @@ class MainWindow(QMainWindow):
         self.category_ctrl.suggestions_changed.connect(self._on_suggestions_changed)
         self.category_ctrl.track_details_changed.connect(self._on_track_details_changed)
         self.category_ctrl.write_failed.connect(self._on_write_failed)
+
+    def _connect_shortcuts(self) -> None:
+        QShortcut(QKeySequence("Ctrl+F"), self).activated.connect(self.search_input.setFocus)
+        QShortcut(QKeySequence("Ctrl+R"), self).activated.connect(self._refresh_library)
+        QShortcut(QKeySequence("Ctrl+O"), self).activated.connect(self._add_folder)
 
     def _on_write_failed(self, file_path: str, msg: str) -> None:
         self.statusBar().showMessage(
@@ -264,7 +269,8 @@ class MainWindow(QMainWindow):
 
         self.library.add_folder(folder)
         self._register_volume(folder)
-        self._load_library()
+        populate_folder_tree(self.folder_tree_widget, self.library.get_folders())
+        self._start_scan([folder], announce_done=False)
 
     def _refresh_library(self):
         if self._is_scanning():
@@ -353,9 +359,6 @@ class MainWindow(QMainWindow):
             self._scan_worker.cancel()
             self.scan_status_label.setText("Cancelling...")
 
-    def _on_folder_clicked(self, item, column):
-        pass
-
     def _on_folder_context_menu(self, pos):
         item = self.folder_tree_widget.itemAt(pos)
         if not item:
@@ -384,7 +387,8 @@ class MainWindow(QMainWindow):
         )
         if reply == QMessageBox.StandardButton.Yes:
             self.library.remove_folder(folder)
-            self._load_library()
+            populate_folder_tree(self.folder_tree_widget, self.library.get_folders())
+            self._load_tracks()
 
     def _open_folder_in_explorer(self, folder: str):
         system = platform.system()
@@ -474,7 +478,24 @@ class MainWindow(QMainWindow):
             if event.key() in (Qt.Key.Key_Enter, Qt.Key.Key_Return):
                 self._play_selected_track()
                 return True
+            if event.key() == Qt.Key.Key_Space:
+                self._toggle_playback_for_selected_track()
+                return True
         return super().eventFilter(obj, event)
+
+    def _toggle_playback_for_selected_track(self) -> None:
+        selected = self.track_table_widget.selectedItems()
+        if not selected:
+            return
+        row = selected[0].row()
+        track = self.track_table_widget.item(row, 0).data(Qt.ItemDataRole.UserRole)
+        if not track:
+            return
+        current = self.playback_ctrl.current_track
+        if current is not None and current.id == track.id:
+            self.playback_ctrl.toggle_playback()
+            return
+        self.playback_ctrl.play_track(track)
 
     def _play_selected_track(self):
         selected = self.track_table_widget.selectedItems()
