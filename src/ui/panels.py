@@ -1,5 +1,6 @@
 """UI panels — folder tree, track table, details panel, playback bar."""
 
+import os
 from enum import IntEnum
 from typing import TYPE_CHECKING
 
@@ -98,7 +99,7 @@ def create_folder_panel() -> tuple[QWidget, QTreeWidget, QPushButton, QPushButto
     folder_tree_widget = QTreeWidget()
     folder_tree_widget.setHeaderHidden(True)
     folder_tree_widget.setAlternatingRowColors(True)
-    folder_tree_widget.setIndentation(0)
+    folder_tree_widget.setIndentation(16)
     folder_tree_widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
     folder_tree_widget.header().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
     layout.addWidget(folder_tree_widget)
@@ -363,13 +364,61 @@ def update_suggestions(
             suggestions_layout.addWidget(btn)
 
 
-def populate_folder_tree(tree: QTreeWidget, folders: list[str]) -> None:
+def populate_folder_tree(
+    tree: QTreeWidget, folders: list[str], tracks: list[Track] | None = None
+) -> None:
+    """Populate folder tree with top-level folders and subfolders that contain tracks.
+
+    Subfolders are derived from the actual file paths of scanned tracks. Only
+    directories that directly contain audio files are shown as children.
+    Existing check states are preserved when the tree is rebuilt.
+    """
+    # Capture existing check states before clearing
+    prev_states: dict[str, Qt.CheckState] = {}
+    for i in range(tree.topLevelItemCount()):
+        top = tree.topLevelItem(i)
+        if top is None:
+            continue
+        path = top.data(0, Qt.ItemDataRole.UserRole)
+        prev_states[path] = top.checkState(0)
+        for j in range(top.childCount()):
+            child = top.child(j)
+            if child is None:
+                continue
+            cpath = child.data(0, Qt.ItemDataRole.UserRole)
+            prev_states[cpath] = child.checkState(0)
+
+    # Compute which directories directly contain files, grouped by root folder
+    subfolder_map: dict[str, set[str]] = {f: set() for f in folders}
+    if tracks:
+        for track in tracks:
+            file_dir = os.path.dirname(track.file_path)
+            if track.folder_path in subfolder_map and file_dir != track.folder_path:
+                subfolder_map[track.folder_path].add(file_dir)
+
+    tree.blockSignals(True)
     tree.clear()
+
     for folder in folders:
-        item = QTreeWidgetItem([folder])
-        item.setCheckState(0, Qt.CheckState.Checked)
-        item.setData(0, Qt.ItemDataRole.UserRole, folder)
-        tree.addTopLevelItem(item)
+        display_name = os.path.basename(folder) or folder
+        top_item = QTreeWidgetItem([display_name])
+        top_item.setCheckState(0, prev_states.get(folder, Qt.CheckState.Checked))
+        top_item.setData(0, Qt.ItemDataRole.UserRole, folder)
+        top_item.setToolTip(0, folder)
+
+        subfolders = sorted(subfolder_map.get(folder, set()))
+        for subfolder in subfolders:
+            rel_path = os.path.relpath(subfolder, folder)
+            child_item = QTreeWidgetItem([rel_path])
+            child_item.setCheckState(0, prev_states.get(subfolder, Qt.CheckState.Checked))
+            child_item.setData(0, Qt.ItemDataRole.UserRole, subfolder)
+            child_item.setToolTip(0, subfolder)
+            top_item.addChild(child_item)
+
+        tree.addTopLevelItem(top_item)
+        top_item.setExpanded(True)
+
+    tree.blockSignals(False)
 
 
 def get_folder_width(tree: QTreeWidget, folders: list[str]) -> int:
@@ -377,8 +426,8 @@ def get_folder_width(tree: QTreeWidget, folders: list[str]) -> int:
         return 200
     font = tree.font()
     metrics = QFontMetrics(font)
-    max_width = max(metrics.horizontalAdvance(f) for f in folders)
-    return max_width + 40
+    max_width = max(metrics.horizontalAdvance(os.path.basename(f) or f) for f in folders)
+    return max_width + 60
 
 
 def create_scan_progress_bar() -> tuple[QWidget, QLabel, QProgressBar, QPushButton]:

@@ -156,6 +156,7 @@ class MainWindow(QMainWindow):
         self.add_folder_btn.clicked.connect(self._add_folder)
         self.refresh_btn.clicked.connect(self._refresh_library)
         self.folder_tree_widget.customContextMenuRequested.connect(self._on_folder_context_menu)
+        self.folder_tree_widget.itemChanged.connect(self._on_folder_item_changed)
         self.search_input.textChanged.connect(self.search_ctrl.on_text_changed)
         self.track_table_widget.itemDoubleClicked.connect(self._on_track_double_clicked)
         self.track_table_widget.itemSelectionChanged.connect(self._on_track_selected)
@@ -194,7 +195,8 @@ class MainWindow(QMainWindow):
     def _load_library(self):
         self._reassociate_volumes()
         folders = self.library.get_folders()
-        populate_folder_tree(self.folder_tree_widget, folders)
+        existing_tracks = self.library.get_all_tracks()
+        populate_folder_tree(self.folder_tree_widget, folders, existing_tracks or None)
 
         if folders:
             folder_width = get_folder_width(self.folder_tree_widget, folders)
@@ -342,6 +344,10 @@ class MainWindow(QMainWindow):
     def _on_scan_folder_done(self, folder: str, tracks: list) -> None:
         for track in tracks:
             self.library.add_track(track)
+        # Rebuild tree to show discovered subfolders
+        all_tracks = self.library.get_all_tracks()
+        folders = self.library.get_folders()
+        populate_folder_tree(self.folder_tree_widget, folders, all_tracks)
         self._load_tracks()
 
     def _on_scan_error(self, folder: str, message: str) -> None:
@@ -406,6 +412,68 @@ class MainWindow(QMainWindow):
                 subprocess.run(["open", folder], check=False)
         except Exception:
             QDesktopServices.openUrl(QUrl.fromLocalFile(folder))
+
+    def _on_folder_item_changed(self, item, column: int) -> None:
+        """Cascade checkbox changes between parent folders and subfolder children."""
+        tree = self.folder_tree_widget
+        tree.blockSignals(True)
+
+        parent = item.parent()
+        if parent is None:
+            # Top-level folder changed — propagate to all children (unless partial)
+            new_state = item.checkState(0)
+            if new_state != Qt.CheckState.PartiallyChecked:
+                for i in range(item.childCount()):
+                    child = item.child(i)
+                    if child:
+                        child.setCheckState(0, new_state)
+        else:
+            # Subfolder changed — update parent to reflect aggregate state
+            checked_count = sum(
+                1
+                for i in range(parent.childCount())
+                if parent.child(i) and parent.child(i).checkState(0) == Qt.CheckState.Checked
+            )
+            total = parent.childCount()
+            if checked_count == total:
+                parent.setCheckState(0, Qt.CheckState.Checked)
+            elif checked_count == 0:
+                parent.setCheckState(0, Qt.CheckState.Unchecked)
+            else:
+                parent.setCheckState(0, Qt.CheckState.PartiallyChecked)
+
+        tree.blockSignals(False)
+        self._on_folder_filter_changed()
+
+    def _on_folder_filter_changed(self) -> None:
+        """Filter visible tracks based on checked folders and subfolders."""
+        tree = self.folder_tree_widget
+        checked_dirs: set[str] = set()
+
+        for i in range(tree.topLevelItemCount()):
+            top = tree.topLevelItem(i)
+            if top is None or top.checkState(0) == Qt.CheckState.Unchecked:
+                continue
+
+            root_path = top.data(0, Qt.ItemDataRole.UserRole)
+
+            if top.childCount() == 0:
+                # No subfolders — include all tracks in this root folder
+                checked_dirs.add(root_path)
+            else:
+                # Has subfolders — root-level files always follow parent state,
+                # individual subfolders follow their own check state
+                checked_dirs.add(root_path)
+                for j in range(top.childCount()):
+                    child = top.child(j)
+                    if child and child.checkState(0) == Qt.CheckState.Checked:
+                        checked_dirs.add(child.data(0, Qt.ItemDataRole.UserRole))
+
+        all_tracks = self.library.get_all_tracks()
+        visible_tracks = [t for t in all_tracks if os.path.dirname(t.file_path) in checked_dirs]
+        self.all_tracks = visible_tracks
+        self.playback_ctrl.set_track_list(self.all_tracks)
+        self.track_table_manager.populate(self.all_tracks)
 
     def _on_search_results(self, tracks: list[Track]) -> None:
         self.all_tracks = tracks
