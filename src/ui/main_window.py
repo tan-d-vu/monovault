@@ -160,6 +160,8 @@ class MainWindow(QMainWindow):
         self.search_input.textChanged.connect(self.search_ctrl.on_text_changed)
         self.track_table_widget.itemDoubleClicked.connect(self._on_track_double_clicked)
         self.track_table_widget.itemSelectionChanged.connect(self._on_track_selected)
+        self.track_table_widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.track_table_widget.customContextMenuRequested.connect(self._on_track_context_menu)
         self.track_table_widget.installEventFilter(self)
         self.category_input.returnPressed.connect(self._on_add_category_input)
         self.category_input.textChanged.connect(self._on_category_input_changed)
@@ -479,6 +481,50 @@ class MainWindow(QMainWindow):
         self.all_tracks = tracks
         self.track_table_manager.populate(self.all_tracks)
         self.playback_ctrl.set_track_list(self.all_tracks)
+
+    def _on_track_context_menu(self, pos) -> None:
+        selected_rows = {item.row() for item in self.track_table_widget.selectedItems()}
+        if not selected_rows:
+            return
+
+        selected_tracks: list[Track] = []
+        for row in selected_rows:
+            item = self.track_table_widget.item(row, 0)
+            if item is None:
+                continue
+            track = item.data(Qt.ItemDataRole.UserRole)
+            if track:
+                selected_tracks.append(track)
+
+        if not selected_tracks:
+            return
+
+        tracks_with_categories = [t for t in selected_tracks if t.categories]
+
+        menu = QMenu(self)
+        clear_action = menu.addAction("Clear Categories")
+        if not tracks_with_categories:
+            clear_action.setEnabled(False)
+
+        action = menu.exec(self.track_table_widget.viewport().mapToGlobal(pos))
+        if action == clear_action and tracks_with_categories:
+            self._confirm_and_clear_categories(tracks_with_categories)
+
+    def _confirm_and_clear_categories(self, tracks: list[Track]) -> None:
+        count = len(tracks)
+        noun = "track" if count == 1 else "tracks"
+        reply = QMessageBox.question(
+            self,
+            "Clear Categories",
+            f"Clear all categories from {count} {noun}?\nThis cannot be undone.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        cleared = self.category_ctrl.clear_categories_bulk(tracks)
+        for track in tracks:
+            self.track_table_manager.update_track(track)
+        self.statusBar().showMessage(f"Cleared categories from {cleared} {noun}.", 3000)
 
     def _on_track_double_clicked(self, item, column=None):
         row = item.row()

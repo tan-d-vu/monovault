@@ -250,3 +250,90 @@ class TestCategoryController:
         ctrl = CategoryController(categorizer)
         # shutdown() should not raise even with an idle pool
         ctrl.shutdown()
+
+
+@pytest.mark.unit
+class TestClearCategoriesBulk:
+    def _make_track(self, track_id: int, categories=None) -> Track:
+        return Track(
+            id=track_id,
+            file_path=f"/tmp/track{track_id}.mp3",
+            title=f"Track {track_id}",
+            artist="Artist",
+            album="Album",
+            duration=180.0,
+            categories=list(categories) if categories else [],
+            album_art=None,
+            folder_path="/tmp",
+        )
+
+    def test_bulk_clear_skips_tracks_without_categories(self, qapp):
+        categorizer = MagicMock()
+        ctrl = make_ctrl(categorizer)
+
+        tracks = [self._make_track(1, []), self._make_track(2, [])]
+        result = ctrl.clear_categories_bulk(tracks)
+
+        assert result == 0
+        categorizer.apply_categories.assert_not_called()
+        ctrl._schedule_write.assert_not_called()  # type: ignore[union-attr]
+
+    def test_bulk_clear_clears_all_tracks_with_categories(self, qapp):
+        categorizer = MagicMock()
+        ctrl = make_ctrl(categorizer)
+
+        track1 = self._make_track(1, ["rock"])
+        track2 = self._make_track(2, ["jazz", "blues"])
+        track3 = self._make_track(3, [])
+
+        result = ctrl.clear_categories_bulk([track1, track2, track3])
+
+        assert result == 2
+        assert categorizer.apply_categories.call_count == 2
+        ctrl._schedule_write.assert_any_call(track1.file_path, [])  # type: ignore[union-attr]
+        ctrl._schedule_write.assert_any_call(track2.file_path, [])  # type: ignore[union-attr]
+
+    def test_bulk_clear_emits_categories_changed_per_track(self, qapp):
+        categorizer = MagicMock()
+        ctrl = make_ctrl(categorizer)
+
+        track1 = self._make_track(1, ["rock"])
+        track2 = self._make_track(2, ["jazz"])
+
+        emitted = []
+        ctrl.categories_changed.connect(emitted.append)
+
+        ctrl.clear_categories_bulk([track1, track2])
+
+        assert len(emitted) == 2
+        assert track1 in emitted
+        assert track2 in emitted
+
+    def test_bulk_clear_refreshes_suggestions_for_current_track(self, qapp):
+        categorizer = MagicMock()
+        categorizer.get_suggestions.return_value = []
+        ctrl = make_ctrl(categorizer)
+
+        track = self._make_track(1, ["rock"])
+        ctrl.select_track(track)
+        categorizer.get_suggestions.reset_mock()
+
+        ctrl.clear_categories_bulk([track])
+
+        categorizer.get_suggestions.assert_called_once_with(track)
+
+    def test_bulk_clear_does_not_refresh_suggestions_when_current_track_not_in_selection(
+        self, qapp
+    ):
+        categorizer = MagicMock()
+        categorizer.get_suggestions.return_value = []
+        ctrl = make_ctrl(categorizer)
+
+        current = self._make_track(1, ["rock"])
+        other = self._make_track(2, ["jazz"])
+        ctrl.select_track(current)
+        categorizer.get_suggestions.reset_mock()
+
+        ctrl.clear_categories_bulk([other])
+
+        categorizer.get_suggestions.assert_not_called()

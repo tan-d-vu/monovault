@@ -98,6 +98,26 @@ class CategoryController(QObject):
         self._schedule_write(self._current_track.file_path, [])
         return True
 
+    def clear_categories_bulk(self, tracks: list[Track]) -> int:
+        """Clear categories from multiple tracks. Returns count of tracks modified."""
+        tracks_with_categories = [t for t in tracks if t.categories]
+        if not tracks_with_categories:
+            return 0
+
+        for track in tracks_with_categories:
+            self._categorizer.apply_categories(track, [])
+            self.categories_changed.emit(track)
+            if self._bus:
+                from ...core.events import CategoriesChanged
+
+                self._bus.publish(CategoriesChanged(track=track))
+            self._schedule_write(track.file_path, [])
+
+        if self._current_track and self._current_track in tracks_with_categories:
+            self._refresh_suggestions()
+
+        return len(tracks_with_categories)
+
     def accept_suggestion(self, category: str) -> bool:
         return self.add_category(category)
 
