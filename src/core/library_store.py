@@ -53,6 +53,26 @@ class LibraryStore:
         key = self._to_key(file_path)
         return self._data.get(key, "")
 
+    def remove(self, file_path: str) -> None:
+        """Remove a file's date_added entry and persist.
+
+        No-op if the key isn't present.
+        """
+        key = self._to_key(file_path)
+        if self._data.pop(key, None) is not None:
+            self.save()
+
+    def set(self, file_path: str, iso_date: str) -> None:
+        """Insert a file's date_added directly (used on restore).
+
+        Unlike record_if_new, this does NOT re-derive from mtime — it preserves
+        the caller-supplied ISO date so a restored track keeps its original
+        date_added value.
+        """
+        key = self._to_key(file_path)
+        self._data[key] = iso_date
+        self.save()
+
     def save(self) -> None:
         """Save data to library.json.
 

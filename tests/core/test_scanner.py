@@ -99,6 +99,19 @@ class TestFindAudioFiles:
         names = sorted(Path(p).name for p in found)
         assert names == ["loud.MP3", "quiet.Flac"]
 
+    def test_skips_dot_monovault_directory(self, tmp_path):
+        """The app's private dir (library.json, trash) must never be re-scanned."""
+        (tmp_path / "real.mp3").write_bytes(b"")
+        trashed_dir = tmp_path / ".monovault" / "trash"
+        trashed_dir.mkdir(parents=True)
+        (trashed_dir / "abc123.mp3").write_bytes(b"")
+
+        scanner = Scanner()
+        found = scanner._find_audio_files(tmp_path)
+
+        names = sorted(Path(p).name for p in found)
+        assert names == ["real.mp3"]
+
 
 @pytest.mark.unit
 class TestProcessFile:

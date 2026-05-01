@@ -26,6 +26,7 @@ from ..core.scanner import Scanner
 from ..core.volume_utils import ensure_volume_id, find_volume_by_id
 from ..models.track import Track
 from .controllers import CategoryController, PlaybackController, SearchController
+from .controllers.delete_controller import DeleteController
 from .panels import (
     create_details_panel,
     create_folder_panel,
@@ -63,6 +64,9 @@ class MainWindow(QMainWindow):
         self.playback_ctrl = PlaybackController(self.playback_engine, bus=self._bus, parent=self)
         self.search_ctrl = SearchController(self.library, bus=self._bus, parent=self)
         self.category_ctrl = CategoryController(self.categorizer, bus=self._bus, parent=self)
+        self.delete_ctrl = DeleteController(
+            self.library, self.playback_engine, self.scanner, parent=self
+        )
 
         self.all_tracks: list[Track] = []
 
@@ -184,10 +188,16 @@ class MainWindow(QMainWindow):
         self.category_ctrl.track_details_changed.connect(self._on_track_details_changed)
         self.category_ctrl.write_failed.connect(self._on_write_failed)
 
+        self.delete_ctrl.delete_completed.connect(self._on_delete_completed)
+        self.delete_ctrl.delete_failed.connect(self._on_delete_failed)
+        self.delete_ctrl.restore_completed.connect(self._on_restore_completed)
+        self.delete_ctrl.restore_failed.connect(self._on_restore_failed)
+
     def _connect_shortcuts(self) -> None:
         QShortcut(QKeySequence("Ctrl+F"), self).activated.connect(self.search_input.setFocus)
         QShortcut(QKeySequence("Ctrl+R"), self).activated.connect(self._refresh_library)
         QShortcut(QKeySequence("Ctrl+O"), self).activated.connect(self._add_folder)
+        QShortcut(QKeySequence("Ctrl+Shift+T"), self).activated.connect(self._open_trash_dialog)
 
     def _on_write_failed(self, file_path: str, msg: str) -> None:
         self.toast.show_message(
@@ -505,10 +515,14 @@ class MainWindow(QMainWindow):
         clear_action = menu.addAction("Clear Categories")
         if not tracks_with_categories:
             clear_action.setEnabled(False)
+        menu.addSeparator()
+        delete_action = menu.addAction("Move to Trash")
 
         action = menu.exec(self.track_table_widget.viewport().mapToGlobal(pos))
         if action == clear_action and tracks_with_categories:
             self._confirm_and_clear_categories(tracks_with_categories)
+        elif action == delete_action:
+            self._confirm_and_delete_tracks(selected_tracks)
 
     def _confirm_and_clear_categories(self, tracks: list[Track]) -> None:
         count = len(tracks)
@@ -525,6 +539,68 @@ class MainWindow(QMainWindow):
         for track in tracks:
             self.track_table_manager.update_track(track)
         self.statusBar().showMessage(f"Cleared categories from {cleared} {noun}.", 3000)
+
+    def _delete_selected_tracks(self) -> None:
+        selected_rows = {item.row() for item in self.track_table_widget.selectedItems()}
+        if not selected_rows:
+            return
+        tracks: list[Track] = []
+        for row in selected_rows:
+            item = self.track_table_widget.item(row, 0)
+            if item is None:
+                continue
+            track = item.data(Qt.ItemDataRole.UserRole)
+            if track:
+                tracks.append(track)
+        if tracks:
+            self._confirm_and_delete_tracks(tracks)
+
+    def _confirm_and_delete_tracks(self, tracks: list[Track]) -> None:
+        count = len(tracks)
+        noun = "track" if count == 1 else "tracks"
+        reply = QMessageBox.question(
+            self,
+            "Move to Trash",
+            f"Move {count} {noun} to Trash?\nYou can restore them from the Trash dialog.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        self.delete_ctrl.delete_tracks(tracks)
+
+    def _on_delete_completed(self, count: int) -> None:
+        if count == 0:
+            return
+        noun = "track" if count == 1 else "tracks"
+        self.toast.show_message(f"Moved {count} {noun} to Trash")
+        self._on_folder_filter_changed()
+
+    def _on_delete_failed(self, message: str, partial_count: int) -> None:
+        if partial_count > 0:
+            noun = "track" if partial_count == 1 else "tracks"
+            self.toast.show_message(
+                f"Moved {partial_count} {noun} to Trash; some failed: {message}"
+            )
+        else:
+            self.toast.show_message(f"Failed to move tracks to Trash: {message}")
+        self._on_folder_filter_changed()
+
+    def _on_restore_completed(self, tracks: list[Track]) -> None:
+        if not tracks:
+            return
+        count = len(tracks)
+        noun = "track" if count == 1 else "tracks"
+        self.toast.show_message(f"Restored {count} {noun}")
+        self._on_folder_filter_changed()
+
+    def _on_restore_failed(self, message: str) -> None:
+        self.toast.show_message(f"Restore failed: {message}")
+
+    def _open_trash_dialog(self) -> None:
+        from .trash_dialog import TrashDialog
+
+        dialog = TrashDialog(self.delete_ctrl, parent=self)
+        dialog.exec()
 
     def _on_track_double_clicked(self, item, column=None):
         row = item.row()
@@ -608,6 +684,9 @@ class MainWindow(QMainWindow):
                 return True
             if event.key() == Qt.Key.Key_Space:
                 self._toggle_playback_for_selected_track()
+                return True
+            if event.key() == Qt.Key.Key_Delete:
+                self._delete_selected_tracks()
                 return True
         return super().eventFilter(obj, event)
 

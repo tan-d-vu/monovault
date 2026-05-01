@@ -235,3 +235,69 @@ def test_record_if_new_with_empty_dir():
         date_added = store.record_if_new(str(test_file))
         assert date_added == store.get(str(test_file))
         assert date_added != ""
+
+
+@pytest.mark.unit
+def test_remove_drops_entry_and_persists():
+    """remove() should pop the entry and write the change to disk."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        base_dir = Path(tmpdir)
+        store = LibraryStore(base_dir)
+
+        test_file = base_dir / "songs" / "test.mp3"
+        test_file.parent.mkdir(parents=True)
+        test_file.write_text("test")
+        store.record_if_new(str(test_file))
+
+        store.remove(str(test_file))
+
+        assert store.get(str(test_file)) == ""
+        # Reload to confirm persistence
+        fresh_store = LibraryStore(base_dir)
+        assert fresh_store.get(str(test_file)) == ""
+
+
+@pytest.mark.unit
+def test_remove_unknown_path_is_noop():
+    """remove() on a path that was never recorded should not raise."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        base_dir = Path(tmpdir)
+        store = LibraryStore(base_dir)
+
+        store.remove(str(base_dir / "never-recorded.mp3"))
+
+
+@pytest.mark.unit
+def test_set_preserves_caller_supplied_iso_date():
+    """set() should NOT re-derive from mtime — it stores exactly what's passed."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        base_dir = Path(tmpdir)
+        store = LibraryStore(base_dir)
+
+        test_file = base_dir / "songs" / "old.mp3"
+        test_file.parent.mkdir(parents=True)
+        test_file.write_text("test")
+
+        store.set(str(test_file), "2020-01-15")
+
+        assert store.get(str(test_file)) == "2020-01-15"
+        fresh_store = LibraryStore(base_dir)
+        assert fresh_store.get(str(test_file)) == "2020-01-15"
+
+
+@pytest.mark.unit
+def test_remove_then_set_round_trip_preserves_date():
+    """Delete+restore round trip must preserve the original date_added."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        base_dir = Path(tmpdir)
+        store = LibraryStore(base_dir)
+
+        test_file = base_dir / "songs" / "track.mp3"
+        test_file.parent.mkdir(parents=True)
+        test_file.write_text("test")
+
+        original = store.record_if_new(str(test_file))
+        store.remove(str(test_file))
+        store.set(str(test_file), original)
+
+        assert store.get(str(test_file)) == original

@@ -41,6 +41,19 @@ class LibraryManager:
         if track.id in self.tracks:
             self.tracks[track.id] = track
 
+    def delete_tracks(self, track_ids: list[int]) -> list[Track]:
+        """Remove tracks from the library and return the removed Track objects.
+
+        Caller is responsible for any side effects (file moves, store updates).
+        Unknown ids are silently skipped.
+        """
+        removed: list[Track] = []
+        for track_id in track_ids:
+            track = self.tracks.pop(track_id, None)
+            if track is not None:
+                removed.append(track)
+        return removed
+
     def get_all_tracks(self) -> list[Track]:
         return list(self.tracks.values())
 

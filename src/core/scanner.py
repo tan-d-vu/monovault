@@ -43,7 +43,8 @@ class Scanner:
     def _find_audio_files(self, folder: Path) -> list[str]:
         """Find all supported audio files in folder recursively."""
         audio_files = []
-        for root, _dirs, files in os.walk(folder):
+        for root, dirs, files in os.walk(folder):
+            dirs[:] = [d for d in dirs if d != ".monovault"]
             for filename in files:
                 file_path = os.path.join(root, filename)
                 if is_supported(file_path):

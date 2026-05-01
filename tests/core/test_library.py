@@ -157,6 +157,35 @@ class TestLibraryManager:
         assert library.get_track_by_id(999) is None
 
     # ------------------------------------------------------------------
+    # delete_tracks
+    # ------------------------------------------------------------------
+
+    @pytest.mark.unit
+    def test_delete_tracks_removes_and_returns_objects(
+        self, library: LibraryManager
+    ) -> None:
+        first_id = library.add_track(make_track(file_path="/tmp/a.mp3"))
+        second_id = library.add_track(make_track(file_path="/tmp/b.mp3"))
+        third_id = library.add_track(make_track(file_path="/tmp/c.mp3"))
+
+        removed = library.delete_tracks([first_id, third_id])
+
+        removed_paths = sorted(t.file_path for t in removed)
+        assert removed_paths == ["/tmp/a.mp3", "/tmp/c.mp3"]
+        assert library.get_track_by_id(first_id) is None
+        assert library.get_track_by_id(third_id) is None
+        assert library.get_track_by_id(second_id) is not None
+
+    @pytest.mark.unit
+    def test_delete_tracks_skips_unknown_ids(self, library: LibraryManager) -> None:
+        existing_id = library.add_track(make_track(file_path="/tmp/real.mp3"))
+
+        removed = library.delete_tracks([existing_id, 999, 1000])
+
+        assert len(removed) == 1
+        assert removed[0].file_path == "/tmp/real.mp3"
+
+    # ------------------------------------------------------------------
     # search
     # ------------------------------------------------------------------
 
