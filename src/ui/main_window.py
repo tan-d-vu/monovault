@@ -13,6 +13,7 @@ from PyQt6.QtWidgets import (
     QMenu,
     QMessageBox,
     QSplitter,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -25,8 +26,10 @@ from ..core.playback import PlaybackEngine
 from ..core.scanner import Scanner
 from ..core.volume_utils import ensure_volume_id, find_volume_by_id
 from ..models.track import Track
+from .category_stats_tab import UNTAGGED_SENTINEL, CategoryStatsTab
 from .controllers import CategoryController, PlaybackController, SearchController
 from .controllers.delete_controller import DeleteController
+from .duplicates_tab import DuplicatesTab
 from .panels import (
     create_details_panel,
     create_folder_panel,
@@ -120,15 +123,36 @@ class MainWindow(QMainWindow):
         splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.addWidget(self.folder_tree_panel)
         splitter.addWidget(self.track_table_panel)
-        splitter.addWidget(self.details_panel)
-        splitter.setSizes([200, 500, 280])
+        splitter.setSizes([200, 500])
         splitter.setStretchFactor(0, 0)
         splitter.setStretchFactor(1, 1)
-        splitter.setStretchFactor(2, 0)
         splitter.setHandleWidth(1)
-        splitter.setCollapsible(2, False)
         self._splitter = splitter
-        main_layout.addWidget(self._splitter)
+
+        self.duplicates_tab = DuplicatesTab(self.library, self._confirm_and_delete_tracks)
+        self.duplicates_tab.track_selected.connect(self.category_ctrl.select_track)
+
+        self.category_stats_tab = CategoryStatsTab(self.library)
+        self.category_stats_tab.category_filter_requested.connect(
+            self._on_category_filter_requested
+        )
+
+        self._tabs = QTabWidget()
+        self._tabs.addTab(self._splitter, "Library")
+        self._tabs.addTab(self.duplicates_tab, "Duplicates")
+        self._tabs.addTab(self.category_stats_tab, "Categories")
+        self._tabs.currentChanged.connect(self._on_tab_changed)
+
+        outer_splitter = QSplitter(Qt.Orientation.Horizontal)
+        outer_splitter.addWidget(self._tabs)
+        outer_splitter.addWidget(self.details_panel)
+        outer_splitter.setSizes([700, 280])
+        outer_splitter.setStretchFactor(0, 1)
+        outer_splitter.setStretchFactor(1, 0)
+        outer_splitter.setHandleWidth(1)
+        outer_splitter.setCollapsible(1, False)
+        self._outer_splitter = outer_splitter
+        main_layout.addWidget(outer_splitter)
 
         (
             self.playback_bar,
@@ -150,7 +174,7 @@ class MainWindow(QMainWindow):
         overall_layout = QVBoxLayout(overall)
         overall_layout.setContentsMargins(4, 4, 4, 4)
         overall_layout.setSpacing(4)
-        overall_layout.addWidget(self._splitter, 1)
+        overall_layout.addWidget(self._outer_splitter, 1)
         overall_layout.addWidget(self.scan_progress_bar)
         overall_layout.addWidget(self.playback_bar)
         self.setCentralWidget(overall)
@@ -188,6 +212,10 @@ class MainWindow(QMainWindow):
         self.category_ctrl.track_details_changed.connect(self._on_track_details_changed)
         self.category_ctrl.write_failed.connect(self._on_write_failed)
 
+        self.category_stats_tab.rename_requested.connect(self._on_category_rename_requested)
+        self.category_stats_tab.merge_requested.connect(self._on_category_merge_requested)
+        self.category_stats_tab.delete_requested.connect(self._on_category_delete_requested)
+
         self.delete_ctrl.delete_completed.connect(self._on_delete_completed)
         self.delete_ctrl.delete_failed.connect(self._on_delete_failed)
         self.delete_ctrl.restore_completed.connect(self._on_restore_completed)
@@ -213,7 +241,7 @@ class MainWindow(QMainWindow):
         if folders:
             folder_width = get_folder_width(self.folder_tree_widget, folders)
             self.folder_tree_widget.setColumnWidth(0, folder_width)
-            self._splitter.setSizes([folder_width + 20, 500, 280])
+            self._splitter.setSizes([folder_width + 20, 500])
 
         self._start_scan(folders, announce_done=False)
 
@@ -271,12 +299,21 @@ class MainWindow(QMainWindow):
             self.track_table_widget.selectRow(0)
 
     def _add_folder(self):
+        from pathlib import Path
+
         if self._is_scanning():
             return
 
         folder = QFileDialog.getExistingDirectory(self, "Select Music Folder")
         if not folder:
             return
+
+        # Canonicalize before any downstream use so library.folders (which
+        # Config.add_folder resolves) and track.folder_path (set by the scanner
+        # from this same string) stay in sync within the session. Without this,
+        # macOS symlinks like /tmp -> /private/tmp cause populate_folder_tree
+        # to miss subfolders until the next launch.
+        folder = str(Path(folder).resolve())
 
         if not os.access(folder, os.W_OK):
             QMessageBox.warning(
@@ -296,6 +333,8 @@ class MainWindow(QMainWindow):
             return
         folders = self.library.get_folders()
         self.library.clear()
+        self.duplicates_tab.invalidate()
+        self.category_stats_tab.invalidate()
         self._load_tracks()
         self._start_scan(folders, announce_done=True)
 
@@ -372,6 +411,7 @@ class MainWindow(QMainWindow):
         self.refresh_btn.setEnabled(True)
         self._scan_thread = None
         self._scan_worker = None
+        self.category_stats_tab.invalidate()
 
         if self._scan_announce_done:
             self._scan_announce_done = False
@@ -410,6 +450,7 @@ class MainWindow(QMainWindow):
         )
         if reply == QMessageBox.StandardButton.Yes:
             self.library.remove_folder(folder)
+            self.duplicates_tab.invalidate()
             populate_folder_tree(self.folder_tree_widget, self.library.get_folders())
             self._load_tracks()
 
@@ -574,6 +615,7 @@ class MainWindow(QMainWindow):
         noun = "track" if count == 1 else "tracks"
         self.toast.show_message(f"Moved {count} {noun} to Trash")
         self._on_folder_filter_changed()
+        self.duplicates_tab.refresh_after_delete()
 
     def _on_delete_failed(self, message: str, partial_count: int) -> None:
         if partial_count > 0:
@@ -584,6 +626,7 @@ class MainWindow(QMainWindow):
         else:
             self.toast.show_message(f"Failed to move tracks to Trash: {message}")
         self._on_folder_filter_changed()
+        self.duplicates_tab.refresh_after_delete()
 
     def _on_restore_completed(self, tracks: list[Track]) -> None:
         if not tracks:
@@ -639,8 +682,11 @@ class MainWindow(QMainWindow):
             self.category_input_hint.hide()
 
     def _on_categories_changed(self, track: Track) -> None:
-        update_categories(track, self.categories_layout, self._on_remove_category)
+        if track is self.category_ctrl.current_track:
+            update_categories(track, self.categories_layout, self._on_remove_category)
         self.track_table_manager.update_track(track)
+        self.duplicates_tab.update_track(track)
+        self.category_stats_tab.invalidate()
 
     def _on_remove_category(self, category: str) -> None:
         self.category_ctrl.remove_category(category)
@@ -665,6 +711,51 @@ class MainWindow(QMainWindow):
 
     def _on_suggestion_clicked(self, category: str, source: str):
         self.category_ctrl.accept_suggestion(category)
+
+    def _on_tab_changed(self, index: int) -> None:
+        widget = self._tabs.widget(index)
+        if widget is self.category_stats_tab:
+            self.category_stats_tab.show_if_dirty()
+
+    def _on_category_filter_requested(self, category: str) -> None:
+        cat = None if category == UNTAGGED_SENTINEL else category
+        self.search_ctrl.filter_by_category(cat)
+        self._tabs.setCurrentIndex(0)
+        self.search_input.blockSignals(True)
+        self.search_input.clear()
+        self.search_input.blockSignals(False)
+        label = "untagged tracks" if cat is None else f'category "{cat}"'
+        self.statusBar().showMessage(f"Filtered to {label}", 5000)
+
+    def _on_category_rename_requested(self, old: str, new: str) -> None:
+        try:
+            modified = self.category_ctrl.replace_everywhere({old}, new)
+        except ValueError as e:
+            self.toast.show_message(f"Rename failed: {e}")
+            return
+        self._announce_bulk(f'Renamed "{old}" → "{new}"', len(modified))
+
+    def _on_category_merge_requested(self, sources: list, target: str) -> None:
+        try:
+            modified = self.category_ctrl.replace_everywhere(set(sources), target)
+        except ValueError as e:
+            self.toast.show_message(f"Merge failed: {e}")
+            return
+        self._announce_bulk(f'Merged {len(sources)} categories into "{target}"', len(modified))
+
+    def _on_category_delete_requested(self, categories: list) -> None:
+        try:
+            modified = self.category_ctrl.replace_everywhere(set(categories), None)
+        except ValueError as e:
+            self.toast.show_message(f"Delete failed: {e}")
+            return
+        label = ", ".join(f'"{c}"' for c in categories)
+        self._announce_bulk(f"Deleted {label}", len(modified))
+
+    def _announce_bulk(self, what: str, count: int) -> None:
+        noun = "track" if count == 1 else "tracks"
+        self.statusBar().showMessage(f"{what} on {count} {noun}.", 5000)
+        self.category_stats_tab.invalidate()
 
     def closeEvent(self, event):
         if self._scan_worker is not None:

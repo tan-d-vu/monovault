@@ -1,65 +1,84 @@
-# MusicVault Development Guide
+# MonoVault Development Guide
 
 ## Project Overview
 
-MusicVault is a lightweight desktop music file manager with manual categorization via metadata tags.
+MonoVault is a lightweight desktop music file manager with manual categorization via metadata tags.
+
+See `SPEC.md` for the full feature specification, UI component details, and edge case handling.
 
 ## Technology Stack
 
 - **Language**: Python 3.10+
 - **UI Framework**: PyQt6
 - **Audio Metadata**: mutagen
-- **Storage**: In-memory (no database)
+- **Storage**: In-memory (no database); per-folder `.monovault/` sidecars for persistence
 - **Packaging**: PyInstaller
 
 ## Project Structure
 
 ```
 monovault/
-├── venv/                        # Virtual environment
+├── venv/
 ├── src/
-│   ├── models/                  # Data models (Track dataclass)
-│   │   └── track.py
-│   ├── core/                    # Business logic
-│   │   ├── config.py            # JSON config for folders
-│   │   ├── library.py           # In-memory library manager
-│   │   ├── library_store.py     # File mtime cache
-│   │   ├── metadata/            # Audio metadata read/write (format registry)
-│   │   │   ├── __init__.py      # Public API (read_metadata, write_comment, ...)
-│   │   │   ├── base.py          # Abstract parser base
-│   │   │   ├── mp3_parser.py    # ID3/MP3 parser
-│   │   │   ├── flac_parser.py   # Vorbis/FLAC parser
-│   │   │   └── registry.py      # Parser registry by extension
-│   │   ├── scanner.py           # Library folder scanner
-│   │   ├── playback.py          # Audio playback engine
-│   │   ├── categorizer.py       # Category add/remove orchestration
-│   │   ├── category_sources.py  # Pluggable suggestion sources
-│   │   ├── interfaces.py        # Protocol interfaces (IMetadataParser, ITrackRepository, ICategorySource)
-│   │   ├── events.py            # EventBus and domain event dataclasses
-│   │   └── volume_utils.py      # Portable/flash-drive volume identification
-│   └── ui/                      # PyQt UI components
-│       ├── main_window.py       # Main application window
-│       ├── panels.py            # Folder tree, track details, playback bar panels
-│       ├── track_table.py       # Track table widget and column enum
-│       ├── widgets.py           # CategoryPill, SuggestionButton
-│       ├── styles.py            # UI theme/styles
-│       ├── scanner_worker.py    # Background folder-scan QThread worker
-│       ├── controllers/         # Decoupled controllers bound to MainWindow
-│       │   ├── playback_controller.py
-│       │   ├── search_controller.py
-│       │   └── category_controller.py
-│       └── workers/             # Background QThread workers
-│           └── metadata_worker.py
-├── tests/                       # Test suite
-├── resources/                   # Icons, images
-├── pyproject.toml               # Project configuration
-├── SPEC.md                      # Full specification
-└── AGENTS.md                    # This file
+│   ├── models/
+│   │   └── track.py              # Track dataclass (id, file_path, title, artist, album,
+│   │                             #   duration, categories, album_art, folder_path,
+│   │                             #   comments, date_added + computed properties)
+│   ├── core/
+│   │   ├── config.py             # JSON config (~/.monovault/config.json): folders + volume registry
+│   │   ├── library.py            # In-memory dict[int, Track] store; search; deduplication
+│   │   ├── library_store.py      # Per-folder date-added cache ({folder}/.monovault/library.json)
+│   │   ├── scanner.py            # Recursive folder scanner; returns Track objects
+│   │   ├── playback.py           # QMediaPlayer wrapper with position/duration/state signals
+│   │   ├── categorizer.py        # Category CRUD + bulk rename/merge/delete via replace_categories_everywhere
+│   │   ├── category_sources.py   # Pluggable suggestion sources (ArtistCategorySource, SimilarCategoryCategorySource)
+│   │   ├── category_stats.py     # compute_stats() → CategoryStats (counts, co-occurrences, orphans)
+│   │   ├── duplicates.py         # find_duplicates() — union-find over 3 rules (artist+title, filename, title+duration)
+│   │   ├── trash.py              # Per-folder TrashManager ({folder}/.monovault/trash/); atomic manifest writes
+│   │   ├── interfaces.py         # Protocol interfaces: IMetadataParser, ITrackRepository, ICategorySource
+│   │   ├── events.py             # EventBus + frozen domain event dataclasses
+│   │   ├── volume_utils.py       # Portable/flash-drive volume ID sidecar read/write/discover
+│   │   └── metadata/
+│   │       ├── __init__.py       # Public API: read_metadata, write_comment, read_comment
+│   │       ├── base.py           # Abstract parser base
+│   │       ├── mp3_parser.py     # ID3/MP3 parser (mutagen)
+│   │       ├── flac_parser.py    # Vorbis/FLAC parser (mutagen)
+│   │       └── registry.py       # Parser registry by file extension
+│   └── ui/
+│       ├── main_window.py        # MainWindow — layout, signal wiring, controller coordination
+│       ├── panels.py             # Folder tree, track details, playback bar, scan progress factory fns
+│       ├── track_table.py        # TrackTableManager + Column enum
+│       ├── category_stats_tab.py # CategoryStatsTab — usage stats, filter, rename/merge/delete
+│       ├── duplicates_tab.py     # DuplicatesTab — runs find_duplicates, lists groups
+│       ├── trash_dialog.py       # TrashDialog — list/restore/purge trashed tracks
+│       ├── scanner_worker.py     # Background ScannerWorker (QThread) with progress/cancel
+│       ├── widgets.py            # CategoryPill (× button), SuggestionButton, Toast
+│       ├── styles.py             # THEME dict + global STYLESHEET
+│       ├── controllers/
+│       │   ├── playback_controller.py   # Playback state, track nav, seeking
+│       │   ├── search_controller.py     # Debounced search + category filter
+│       │   ├── category_controller.py   # Category CRUD, suggestions, async metadata writes
+│       │   └── delete_controller.py     # Trash move/restore/purge coordinating TrashManager
+│       ├── dialogs/
+│       │   └── merge_dialog.py   # MergeDialog — multi-select category merge UI
+│       └── workers/
+│           └── metadata_worker.py  # MetadataWriteWorker (QThreadPool) for async tag writes
+├── tests/
+│   ├── conftest.py
+│   ├── core/                     # Unit/integration tests for all core modules
+│   └── ui/                       # Qt controller and widget tests (pytest-qt)
+├── docs/                         # Implementation plans and architecture notes
+├── pyproject.toml
+├── SPEC.md
+└── AGENTS.md
 ```
 
 ## Build, Test & Lint Commands
 
 ```bash
+# Activate venv (Linux/macOS)
+source venv/bin/activate
+
 # Install dependencies (including dev)
 pip install -e ".[dev]"
 
@@ -72,9 +91,6 @@ pytest
 # Run a single test file
 pytest tests/core/test_library.py
 
-# Run a single test
-pytest tests/core/test_library.py::TestLibraryManager::test_add_track_returns_positive_int
-
 # Run tests by marker
 pytest -m unit
 pytest -m integration
@@ -82,7 +98,7 @@ pytest -m integration
 # Run with coverage
 pytest --cov=src --cov-report=term-missing
 
-# Lint with ruff
+# Lint
 ruff check src/ tests/
 
 # Auto-fix lint issues
@@ -92,127 +108,91 @@ ruff check --fix src/ tests/
 ruff format src/ tests/
 
 # Build executable (Windows)
-pyinstaller --onefile --windowed src/ui/main_window.py
+pyinstaller --onefile --windowed src/ui/main_window.py --name MonoVault
 ```
+
+## Architecture Decisions
+
+### Storage layout
+- **Global config**: `~/.monovault/config.json` — folder list + portable volume registry
+- **Per-folder metadata**: `{folder}/.monovault/library.json` — date-added cache (relative POSIX paths as keys)
+- **Per-folder trash**: `{folder}/.monovault/trash/manifest.json` + UUID-named audio files
+- **Volume sidecar**: `{folder}/.monovault/volume_id` — UUID for portable drive reassociation
+- Files are always the source of truth; in-memory state is rebuilt on every launch
+
+### Category storage
+- Written to COMMENT tag (COMM for MP3, COMMENT for FLAC) as a space-separated string (`"rock favorite workout"`)
+- Writes are async via `MetadataWriteWorker` on a `QThreadPool(maxThreadCount=1)`; failures revert from disk
+
+### UI layout
+```
+QVBoxLayout (central widget)
+├── QSplitter (horizontal) — outer_splitter
+│   ├── QTabWidget
+│   │   ├── Library tab → inner QSplitter: folder_tree_panel | track_table_panel
+│   │   ├── Duplicates tab → DuplicatesTab
+│   │   └── Categories tab → CategoryStatsTab
+│   └── details_panel (280px, non-collapsible)
+├── scan_progress_bar (hidden when idle)
+└── playback_bar (fixed at bottom)
+```
+
+### Duplicate detection
+Three independent rules merged via union-find:
+1. Same `artist` + `title` (case-insensitive)
+2. Same `filename` (case-insensitive)
+3. Same `title` + duration within 1.0 s tolerance
+
+### Category suggestion algorithm
+1. Collect categories from tracks by same artist
+2. Collect categories from tracks sharing any existing category
+3. Deduplicate, exclude already-applied, return up to 5
+
+### Portable volume support
+On launch, any configured folder that no longer exists is matched against the volume registry by UUID. If the volume is found at a new mount point, the path is updated automatically.
 
 ## Code Style Guidelines
 
 ### Imports
-- Use absolute imports: `from src.core.library import LibraryManager`
-- Group imports in order: stdlib, third-party, local
-- Sort alphabetically within groups
-- One module per line
+- Absolute imports: `from src.core.library import LibraryManager`
+- Order: stdlib → third-party → local; sorted alphabetically within groups
 
 ### Formatting
-- Line length: 100 characters max
-- Use 4 spaces for indentation (no tabs)
-- Use ruff for formatting: `ruff format`
-- One blank line between top-level definitions
-- No trailing whitespace
+- Line length: 100 characters (`ruff format`)
+- 4 spaces, no tabs; no trailing whitespace
 
 ### Types
-- Use type hints for all function signatures
-- Use `Optional[X]` instead of `X | None`
-- Use built-in types directly: `list[str]`, `dict[str, int]`
-- Use dataclasses for simple data containers
+- Type hints on all function signatures
+- `X | None` (not `Optional[X]`); built-in generics: `list[str]`, `dict[str, int]`
+- Dataclasses for data containers
 
-### Naming Conventions
-- **Classes**: `PascalCase` (e.g., `LibraryManager`)
-- **Functions/methods**: `snake_case` (e.g., `add_track`)
-- **Constants**: `UPPER_SNAKE_CASE`
-- **Private members**: prefix with `_` (e.g., `_tracks`)
-- **Files**: `snake_case.py`
+### Naming
+- Classes: `PascalCase` | Functions/methods: `snake_case` | Constants: `UPPER_SNAKE_CASE`
+- Private members: `_prefix` | Files: `snake_case.py`
 
-### Error Handling
-- Use exceptions for exceptional cases, not flow control
-- Catch specific exceptions, not bare `Exception`
-- Log errors before re-raising when appropriate
-- Never swallow exceptions silently without logging
+### Error handling
+- Catch specific exceptions; never swallow silently without logging
+- Log before re-raising when appropriate
 
-### Code Patterns
+### Testing
+- Markers: `@pytest.mark.unit`, `@pytest.mark.integration`
+- Fixtures from `conftest.py`: `sample_track`, `sample_tracks`, `qapp`
+- One assertion per test; descriptive names: `test_<method>_<expected_behavior>`
 
-#### Dataclass for models
-```python
-@dataclass
-class Track:
-    id: int
-    file_path: str
-    title: str
-    artist: str
-    album: str
-    duration: float
-    categories: list[str]
-    album_art: Optional[bytes]
-    folder_path: str
-    comments: str = ""
-    date_added: str = ""
-```
+## Key Keyboard Shortcuts
 
-#### PyQt signal connections
-```python
-self.search_input.textChanged.connect(self._on_search_changed)
-```
-
-#### Protocol/Interface pattern
-```python
-from src.core.interfaces import ITrackRepository
-
-class LibraryManager(ITrackRepository):
-    ...
-```
-
-### Testing Guidelines
-- Use pytest with markers: `@pytest.mark.unit`, `@pytest.mark.integration`
-- Use fixtures from `conftest.py`: `sample_track`, `sample_tracks`, `qapp`
-- Test one thing per test function
-- Use descriptive test names: `test_<method>_<expected_behavior>`
-
-## Architecture Decisions
-
-### JSON Config Location
-- `~/.monovault/config.json` (Linux/macOS), `%APPDATA%/monovault/config.json` (Windows)
-- Format: `{"folders": ["/path/to/music1"]}`
-
-### Category Storage
-- Uses COMMENT tag (COMM for MP3, COMMENT for FLAC)
-- Format: space-separated words ("rock favorite workout")
-
-### Category Suggestions
-- Max 5 suggestions from same-artist tracks and shared categories
-- Lowercase, deduplicated, excludes existing categories
-
-### Search
-- Debounced 1.5s with QTimer.singleShot
-- Case-insensitive substring matching on title, artist, album, categories
-
-## Key Modules
-
-| Module | Purpose |
-|--------|---------|
-| `src/core/library.py` | In-memory track storage, search, deduplication |
-| `src/core/library_store.py` | Persists track addition dates and file mtime cache |
-| `src/core/config.py` | JSON config file management |
-| `src/core/metadata/` | Audio metadata read/write via `mutagen`; format-registry package |
-| `src/core/scanner.py` | Recursive folder scanning for audio files |
-| `src/core/playback.py` | `QMediaPlayer` wrapper with position/duration/state signals |
-| `src/core/categorizer.py` | Add/remove categories; writes via `metadata.write_comment` |
-| `src/core/category_sources.py` | Pluggable suggestion sources (by artist, by shared category) |
-| `src/core/interfaces.py` | Protocol interfaces for parsers, repositories, suggestion sources |
-| `src/core/events.py` | `EventBus` and frozen-dataclass domain events |
-| `src/core/volume_utils.py` | Volume identification for portable/flash-drive support |
-| `src/ui/main_window.py` | `MainWindow` — layout creation and controller wiring |
-| `src/ui/panels.py` | Folder tree, track details, and playback bar panels |
-| `src/ui/track_table.py` | Track table widget with column enum |
-| `src/ui/widgets.py` | `CategoryPill`, `SuggestionButton` |
-| `src/ui/styles.py` | `THEME` dict and global `STYLESHEET` |
-| `src/ui/controllers/playback_controller.py` | Playback state, track navigation, seeking |
-| `src/ui/controllers/search_controller.py` | Debounced search with result set management |
-| `src/ui/controllers/category_controller.py` | Category CRUD and suggestions for selected track |
-| `src/ui/scanner_worker.py` | Background folder-scan worker (QThread) with progress/cancel |
-| `src/ui/workers/metadata_worker.py` | Background metadata scanning on a `QThread` |
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl+F` | Focus search |
+| `Ctrl+R` | Refresh library |
+| `Ctrl+O` | Add folder |
+| `Ctrl+Shift+T` | Open Trash dialog |
+| `Space` (track table) | Toggle playback |
+| `Enter` (track table) | Play selected track |
+| `Delete` (track table) | Move selected to Trash |
 
 ## Known Limitations
 
-- No real-time metadata change detection (manual refresh only)
-- Playback: basic controls only (no equalizer, playlist)
-- Search: simple string matching, no fuzzy search
+- No real-time file-system change detection (manual refresh only)
+- Playback: basic controls only (no equalizer, playlist queue)
+- Search: simple case-insensitive substring matching, no fuzzy search

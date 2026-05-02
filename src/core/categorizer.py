@@ -62,3 +62,51 @@ class Categorizer:
         """Overwrite the track's categories in-memory and update the library store."""
         track.categories = categories
         self._library.update_track(track)
+
+    def replace_categories_everywhere(
+        self, sources: set[str], target: str | None
+    ) -> list[Track]:
+        """Replace each of `sources` (case-insensitive) with `target` on every track.
+
+        rename: sources={"rock"}, target="metal"
+        merge:  sources={"rock", "punk"}, target="metal"
+        delete: sources={"rock"}, target=None
+        """
+        target_norm: str | None = None
+        if target is not None:
+            target_norm = target.strip().lower()
+            if not target_norm:
+                raise ValueError("target cannot be empty")
+            if any(c.isspace() for c in target_norm):
+                raise ValueError("target cannot contain whitespace")
+
+        source_set = {s.strip().lower() for s in sources if s.strip()}
+        if target_norm is not None:
+            source_set.discard(target_norm)
+        if not source_set:
+            return []
+
+        modified: list[Track] = []
+        for track in self._library.get_all_tracks():
+            lowered = [c.lower() for c in track.categories]
+            if not any(s in lowered for s in source_set):
+                continue
+            new_cats: list[str] = []
+            seen: set[str] = set()
+            for c in track.categories:
+                cl = c.lower()
+                if cl in source_set:
+                    if target_norm is None:
+                        continue
+                    replacement = target_norm
+                else:
+                    replacement = cl
+                if replacement in seen:
+                    continue
+                seen.add(replacement)
+                new_cats.append(replacement)
+            track.categories = new_cats
+            track.comments = " ".join(new_cats)
+            self._library.update_track(track)
+            modified.append(track)
+        return modified

@@ -1,11 +1,11 @@
-# MusicVault - Specification Document
+# MonoVault — Specification Document
 
 ## 1. Project Overview
 
-**Project Name**: MusicVault  
-**Type**: Desktop Application (Music File Manager)  
-**Core Feature**: Lightweight local music library manager with manual categorization via metadata tags  
-**Target Users**: Music collectors who want to organize their music library by adding custom categories to audio files
+**Project Name**: MonoVault
+**Type**: Desktop Application (Music File Manager)
+**Core Feature**: Lightweight local music library manager with manual categorization via metadata tags
+**Target Users**: Music collectors who want to organize their library by adding custom categories directly to audio file tags
 
 ---
 
@@ -13,279 +13,236 @@
 
 ### 2.1 Layout Structure
 
-**Window Model**: Single main window with optional dialogs for settings/folder selection
+**Window Model**: Single main window (`MainWindow`) with optional dialogs for settings/folder selection and trash management.
 
-**Main Layout (3-panel design)**:
+**Main Layout**:
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│  Menu Bar: File | View | Help                                   │
-├──────────────┬─────────────────────────┬───────────────────────┤
-│              │                         │                       │
-│   FOLDER     │      TRACK LIST         │    TRACK DETAILS      │
-│   PANEL      │      (main view)        │    & CATEGORIES       │
-│              │                         │                       │
-│  [Tree view] │  [Table with columns]   │  [Album art + info]   │
-│              │                         │  [Categories box]     │
-│              │                         │  [Suggestions]        │
-│              │                         │                       │
-├──────────────┴─────────────────────────┴───────────────────────┤
-│  PLAYBACK BAR: [<<][>>][Play/Pause] ───●────── [Vol] 00:00/00:00│
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│  [Library] [Duplicates] [Categories]  │  TRACK DETAILS & CATEGORIES │
+│ ─────────────────────────────────     │                             │
+│  FOLDER PANEL  │  TRACK TABLE         │  [Album art]                │
+│  [Tree view]   │  [Sortable table]    │  Title / Artist / Album     │
+│                │                      │  Date Added                 │
+│                │                      │  [Category pills]           │
+│                │                      │  [Category input]           │
+│                │                      │  [Suggestion buttons]       │
+├────────────────┴──────────────────────┴─────────────────────────────┤
+│  [Scan progress bar — hidden when idle]                             │
+├─────────────────────────────────────────────────────────────────────┤
+│  PLAYBACK BAR: [Prev][Play/Pause][Next] ──●──── 00:00/00:00  [Vol] │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
 **Panel Sizes**:
-- Folder Panel: 200px (resizable, min 150px)
-- Track List: flexible (fill remaining space)
-- Details Panel: 280px (resizable, min 220px)
-
-**UI Mode Toggle**: User can switch between Tree View (folder-based) and Flat List (all tracks)
+- Folder Panel: 200px default (resizable)
+- Track Table: fills remaining space in Library tab
+- Details Panel: 280px (non-collapsible)
 
 ### 2.2 Visual Design
 
-**Color Palette**:
-- Primary Background: `#0A0A0A` (black)
-- Secondary Background: `#1A1A1A` (dark gray)
-- Accent Color: `#808080` (gray)
-- Accent Hover: `#A0A0A0` (lighter gray)
-- Text Primary: `#E5E5E5` (off-white)
-- Text Secondary: `#999999` (medium gray)
-- Border Color: `#333333` (dark gray)
+**Color Palette** (from `styles.py`):
+- Primary Background: `#0A0A0A`
+- Secondary Background: `#1A1A1A`
+- Accent: `#808080`
+- Text Primary: `#E5E5E5`
+- Text Secondary: `#999999`
+- Border: `#333333`
 
 **Typography**:
-- Font Family: Segoe UI (Windows), SF Pro (Mac), fallback: sans-serif
-- Headings: 14px bold
-- Body: 12px regular
-- Small/Labels: 10px regular
-
-**Spacing System**:
-- Base unit: 4px
-- Small padding: 8px
-- Medium padding: 12px
-- Large padding: 16px
-- Panel gaps: 4px
-
-**Visual Effects**:
-- Panel separators: 1px solid border
-- Selected row: accent background with 20% opacity
-- Hover states: background lightens by 5%
-- Focus ring: 2px accent border
+- Font: Segoe UI (Windows), SF Pro (macOS), sans-serif fallback
+- Base size: 12px; headings: 14px bold; labels: 10px
 
 ### 2.3 Components
 
 **Folder Panel**:
-- Tree view of added folders
-- Checkbox to enable/disable folder
-- Right-click: Remove folder
-- States: Normal, Selected, Disabled (unchecked)
+- Tree view of added folders with nested subfolders
+- Tri-state checkboxes for folder/subfolder filtering (Checked / Unchecked / PartiallyChecked)
+- Right-click: Show Folder (opens in OS file explorer) / Remove Folder
 
-**Track List Table**:
-- Columns: #, Title, Artist, Album, Duration, Categories
-- Sortable columns (click header)
-- Multi-select support (Ctrl+Click, Shift+Click)
-- States: Normal, Hover, Selected, Playing (highlighted)
+**Track Table** (Library tab):
+- Columns: #, Title, Artist, Album, Duration, Categories, Date Added
+- Sortable by any column (click header)
+- Multi-select: Ctrl+Click, Shift+Click
+- Right-click: Clear Categories / Move to Trash
+- Playing track highlighted
+
+**Duplicates Tab**:
+- "Find Duplicates" button triggers union-find detection across all library tracks
+- Groups listed with columns: Group, Title, Artist, Album, Duration, Comments, Filename, Location
+- Right-click: Move to Trash (reuses same trash flow as Library tab)
+- Invalidated on library refresh; refreshed after track deletion
+
+**Categories Tab**:
+- Summary: total unique categories, untagged track count
+- Category list table: Name, Track Count (sortable)
+- Orphan filter (categories used by ≤ N tracks)
+- Text filter input
+- Right-click on single category: Filter to Library / Rename / Delete
+- Right-click on multiple categories: Merge / Delete
+- "Filter to Library" switches to Library tab with results applied
+- Rename/merge/delete apply to all tracks across entire library
 
 **Track Details Panel**:
-- Album art (200x200 max, placeholder if none)
-- Title (bold, 14px)
-- Artist - Album (secondary text)
-- Duration
-- Categories display (as pills/tags)
-- Category input field with "Add" button
-
-**Category Suggestions Box**:
-- 5 suggestion buttons max
-- Click to add category to current track
-- Hover tooltip showing source (same artist / similar category)
+- Album art (200×200, placeholder if none)
+- Title (bold), Artist — Album, Date Added
+- Category pills (each with × button to remove)
+- Category input field (single word, Enter to add; multi-word rejected with hint)
+- Suggestion buttons (up to 5)
 
 **Playback Bar**:
-- Previous/Next buttons
-- Play/Pause button (toggles)
-- Seek slider with time display
-- Volume slider with icon
-- Current track info (title - artist)
+- Previous / Play-Pause / Next buttons
+- Seek slider with time display (`MM:SS / MM:SS`)
+- Volume slider
+- Now-playing label (Title — Artist)
+
+**Trash Dialog** (`Ctrl+Shift+T`):
+- Table: Title, Artist, Album, Duration, Categories, Original Path, Deleted At
+- Multi-select: Restore / Delete Permanently
+- Empty Trash button (purges all entries across all folders)
+- Entries from unwatched folders are shown but Restore is disabled
+
+**Toast Notifications**: Non-modal, auto-dismissing overlay for write failures, trash operations, restore results.
+
+**Scan Progress Bar**: Shows `Scanning N/M — filename` during background scan; Cancel button.
 
 ---
 
 ## 3. Functional Specification
 
-### 3.1 Core Features
+### 3.1 Library Management
 
-#### 3.1.1 Library Management
-- **Add Folders**: File > Add Folder (multi-select dialog)
-- **Remove Folders**: Right-click folder > Remove
-- **Folder Persistence**: Folders stored in JSON config file (`~/.monovault/config.json`)
-- **Scan Folders**: Recursive scan for MP3, FLAC files
-- **Metadata Reading**: Extract ID3 (MP3), Vorbis (FLAC) tags
-- **Album Art**: FLAC uses `audio.pictures`, MP3 uses APIC frame (all formats working)
-- **Storage**: In-memory for performance (files remain source of truth)
-- **Refresh**: Menu option to rescan all folders
+- **Add Folder** (`Ctrl+O`): File dialog selects folder; path is canonicalized (resolves symlinks). Requires write access. Creates volume ID sidecar and registers in config.
+- **Remove Folder**: Right-click in folder tree → Remove. Removes all tracks for that folder from in-memory library.
+- **Folder Persistence**: `~/.monovault/config.json` stores folder list.
+- **Scan**: Background `QThread` via `ScannerWorker`. Recursive scan for MP3/FLAC. Progress reported per file. Cancellable. New tracks are added to library folder-by-folder as they arrive.
+- **Refresh** (`Ctrl+R`): Clears library, re-scans all folders. Shows "Refresh Complete" dialog when done.
+- **Folder Filter**: Checking/unchecking folder tree items filters the track table. Subfolders get individual checkboxes; parent tri-state reflects child aggregate.
 
-#### 3.1.2 Audio Playback
-- **Play**: Double-click track or press Play button
-- **Pause**: Click Pause button or spacebar
-- **Stop**: Click Stop button or press Escape
-- **Next/Previous**: Skip to next/previous in current view
-- **Seek**: Drag slider or click on progress bar
-- **Volume**: Drag slider (0-100%)
-- **Mute**: Click volume icon to toggle mute
+### 3.2 Audio Playback
 
-#### 3.1.3 Categorization
-- **View Categories**: Displayed in Track List column and Details panel
-- **Add Category**: Type in input field, press Enter or click Add
-- **Remove Category**: Click X on category pill
-- **Category Storage**: Write to COMMENT/COMM metadata tag
-- **Format**: Each category = one word, space-separated for multiple
+- **Play**: Double-click track or `Enter`; also `Space` toggles playback for selected track
+- **Pause/Resume**: Play/Pause button or `Space`
+- **Next/Previous**: Buttons in playback bar; navigates within current track list view
+- **Seek**: Drag position slider
+- **Volume**: Volume slider (0–100)
+- **Now Playing**: Label shows `Title — Artist` of currently loaded track
 
-#### 3.1.4 Category Suggestions
-- **Algorithm**:
-  1. Get all categories from tracks with same artist
-  2. Get all categories from tracks sharing any category with current track
-  3. Deduplicate and exclude existing categories
-  4. Limit to 5 suggestions
-- **Display**: Clickable buttons in Details panel
+### 3.3 Categorization
 
-#### 3.1.5 Bulk Operations
-- **Multi-select**: Ctrl+Click for individual, Shift+Click for range
-- **Clear Categories**: Select tracks > Right-click > Clear Categories
-- **Confirmation**: Dialog asking to confirm bulk action
+- **Add Category**: Type in input field, press Enter. Single words only (space in input shows inline hint, does not submit).
+- **Remove Category**: Click × on category pill
+- **Bulk Clear**: Right-click selected tracks → Clear Categories (confirmation dialog)
+- **Category Storage**: Written to COMMENT/COMM metadata tag as space-separated string
+- **Async Writes**: `MetadataWriteWorker` on `QThreadPool(maxThreadCount=1)`. On failure: reverts in-memory state from disk and shows toast.
 
-#### 3.1.6 Search
-- **Scope**: Categories, Title, Artist, Album
-- **Behavior**: Filter track list as user types
-- **Debounce**: 1.5 second delay before applying filter
-- **Clear**: Clear button or Escape to reset
+### 3.4 Category Suggestions
 
-### 3.2 User Interactions and Flows
+Algorithm (up to 5 results, deduplicated, excluding existing categories):
+1. Categories from other tracks by the same artist (`ArtistCategorySource`)
+2. Categories from tracks sharing any existing category (`SimilarCategoryCategorySource`)
 
-**First Launch Flow**:
-1. Empty library shown
-2. User clicks File > Add Folder
-3. Select folder(s) in dialog
-4. App scans and populates library
-5. Tracks displayed in list
+### 3.5 Category Management (Categories Tab)
 
-**Playback Flow**:
-1. Select track in list
-2. Click Play or double-click
-3. Track loads and plays
-4. Playback bar shows progress
-5. Can seek, adjust volume, pause
+- **Rename**: Single category → new name. Applied to all tracks in library.
+- **Merge**: Select multiple categories → merge into one target. Applied to all tracks.
+- **Delete**: Remove one or more categories from all tracks entirely.
+- **Orphan Detection**: `CategoryStats.orphans(threshold)` returns categories used by ≤ threshold tracks.
+- **Filter to Library**: Clicking a category filters the Library tab's track table to matching tracks. "Untagged" filter shows tracks with no categories.
 
-**Categorization Flow**:
-1. Select track in list
-2. Details panel shows current categories
-3. Type new category in input
-4. Press Enter or click Add
-5. Category saved to file metadata
-6. UI updates with new category
+### 3.6 Duplicate Detection
 
-**Suggestion Flow**:
-1. Select track
-2. Suggestions populate based on algorithm
-3. Click suggestion button
-4. Category added to track
+**Trigger**: "Find Duplicates" button in Duplicates tab.
 
-### 3.3 Data Flow & Processing
+**Rules** (union-find — any match groups tracks together):
+1. Same `artist` + `title` (case-insensitive, trimmed)
+2. Same `filename` (case-insensitive)
+3. Same `title` + duration within 1.0 second tolerance
 
-**Modules**:
+Groups with only one track are not reported. Groups are sorted largest-first.
 
-1. **LibraryManager**
-   - `add_folder(path: str)` - Add folder to watch list
-   - `remove_folder(path: str)` - Remove folder
-   - `scan_library()` - Rescan all folders
-   - `get_tracks(filters: dict)` - Get filtered tracks
+### 3.7 Trash / Delete
 
-2. **LibraryStore**
-   - `record_if_new(file_path: str)` - Record file addition date
-   - `get(file_path: str)` - Get stored addition date for file
-   - Tracks when files were added to the library
+- **Move to Trash** (`Delete` key or right-click → Move to Trash): Moves file to `{folder}/.monovault/trash/<uuid>.<ext>`. Writes atomic manifest (`tmp + os.replace`). Removes track from library and date-added store.
+- **Restore**: Moves file back to original path. Collision-safe: appends `(restored)` suffix if path already exists. Re-adds track to library with original date_added.
+- **Purge**: Permanently deletes trashed file and removes manifest entry.
+- **Empty Trash**: Purges all entries across all watched folders.
+- Playback is stopped and media source cleared before deleting the currently-playing track (releases file handle on Windows).
 
-3. **MetadataReader**
-   - `read_metadata(file_path: str)` - Read audio file metadata
-   - `write_metadata(file_path: str, data: dict)` - Write metadata
-   - `extract_album_art(file_path: str)` - Extract embedded art
+### 3.8 Search
 
-3. **PlaybackEngine**
-   - `load(track: Track)` - Load track for playback
-   - `play()`, `pause()`, `stop()` - Playback controls
-   - `seek(position: float)` - Seek to position
-   - `set_volume(level: int)` - Set volume 0-100
+- Search box (`Ctrl+F` to focus) filters by Title, Artist, Album, Category
+- Case-insensitive substring match
+- Debounced (300 ms delay)
+- Category filter from Categories tab bypasses text search
 
-4. **CategoryEngine**
-   - `get_suggestions(track: Track)` - Get 5 category suggestions
-   - `add_category(track: Track, category: str)` - Add category
-   - `remove_category(track: Track, category: str)` - Remove category
-   - `clear_categories(track: Track)` - Clear all categories
+### 3.9 Portable Volume Support
 
-5. **SearchEngine**
-   - `search(query: str)` - Search and return filtered tracks
-
-6. **LibraryManager**
-   - `add_folder(path: str)` - Add folder to watch list
-   - `remove_folder(path: str)` - Remove folder
-   - `scan_library()` - Rescan all folders
-   - `get_tracks(filters: dict)` - Get filtered tracks
-
-### 3.4 Edge Cases
-
-- **Empty folders**: Show "No audio files found" message
-- **Corrupt audio files**: Skip and log error, continue scanning
-- **Missing metadata**: Show "Unknown" for missing fields
-- **No album art**: Show placeholder image
-- **Write permission denied**: Show error dialog, don't crash
-- **Very long categories**: Truncate display, show full on hover
-- **Unicode in categories**: Support fully (UTF-8)
-- **Large library (10k+ files)**: Progress indicator during scan
+- On add-folder: `ensure_volume_id()` writes a UUID to `{folder}/.monovault/volume_id` and registers it in `~/.monovault/config.json`.
+- On launch: any configured folder that doesn't exist is looked up by UUID across mounted volumes. If found at a new mount point, the path is updated automatically.
 
 ---
 
-## 4. Acceptance Criteria
+## 4. Data Model
 
-### 4.1 Success Conditions
+### Track
+| Field | Type | Source |
+|-------|------|--------|
+| `id` | `int` | Assigned by LibraryManager |
+| `file_path` | `str` | Filesystem |
+| `title` | `str` | ID3/Vorbis tag |
+| `artist` | `str` | ID3/Vorbis tag |
+| `album` | `str` | ID3/Vorbis tag |
+| `duration` | `float` | Audio stream (seconds) |
+| `categories` | `list[str]` | COMMENT/COMM tag |
+| `album_art` | `bytes \| None` | APIC frame / FLAC picture |
+| `folder_path` | `str` | Parent watched folder |
+| `comments` | `str` | Full COMMENT tag raw value |
+| `date_added` | `str` | `{folder}/.monovault/library.json` |
 
-1. **Library Scanning**
-   - [ ] Can add multiple folders
-   - [ ] Scans recursively for MP3, FLAC
-   - [ ] Displays all tracks in list
-   - [ ] Shows progress for large scans
+Computed properties: `filename`, `location`, `duration_formatted`, `categories_str`
 
-2. **Playback**
-   - [ ] Plays selected track
-   - [ ] Pause/resume works
-   - [ ] Stop works
-   - [ ] Seek works
-   - [ ] Volume control works
-   - [ ] Next/Previous works
+### Storage Files
+| Path | Format | Content |
+|------|--------|---------|
+| `~/.monovault/config.json` | JSON | `{"folders": [...], "volumes": {...}}` |
+| `{folder}/.monovault/library.json` | JSON | `{"relative/path.mp3": "YYYY-MM-DD", ...}` |
+| `{folder}/.monovault/trash/manifest.json` | JSON | `{trash_id: {trash_filename, original_relpath, ...}}` |
+| `{folder}/.monovault/volume_id` | plaintext | UUID hex string |
 
-3. **Categorization**
-   - [ ] Can add category to track
-   - [ ] Category saved to file COMMENT tag
-   - [ ] Can remove category
-   - [ ] Categories display in list and details
+---
 
-4. **Suggestions**
-   - [ ] Shows up to 5 suggestions
-   - [ ] Suggestions from same artist
-   - [ ] Suggestions from similar categories
-   - [ ] Click adds category to track
+## 5. Edge Cases
 
-5. **Bulk Operations**
-   - [ ] Can select multiple tracks
-   - [ ] Can clear categories from selection
+- **Corrupt audio files**: Scanner skips and logs; scan continues
+- **Missing metadata**: Shown as "Unknown" in UI
+- **No album art**: Placeholder shown in details panel
+- **Write permission denied**: Toast notification; in-memory state reverted from disk
+- **Multi-word category input**: Inline hint shown; submission blocked
+- **Duplicate category**: Silently ignored (case-insensitive deduplication)
+- **Read-only folder**: Warning dialog on add; date-added tracking skipped; category writes still attempted via file tags
+- **Trash restore collision**: Appends `(restored)` / `(restored 2)` etc. to filename
+- **Empty library**: Track table shows empty; scan can still be initiated
+- **Scan cancelled**: Partial results retained; progress bar hidden
 
-6. **Search**
-   - [ ] Search filters by title, artist, album, category
-   - [ ] Works with debounce delay
+---
 
-7. **Packaging**
-   - [ ] Builds to single .exe on Windows
-   - [ ] App launches without dependencies
+## 6. Keyboard Shortcuts
 
-### 4.2 Visual Checkpoints
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl+F` | Focus search input |
+| `Ctrl+R` | Refresh library |
+| `Ctrl+O` | Add folder |
+| `Ctrl+Shift+T` | Open Trash dialog |
+| `Space` (track table) | Toggle playback |
+| `Enter` (track table) | Play selected track |
+| `Delete` (track table) | Move selected tracks to Trash |
 
-1. Dark theme with purple accent applied
-2. Three-panel layout visible
-3. Album art displays when available
-4. Categories shown as colored pills
-5. Playback bar functional at bottom
-6. Smooth scrolling in track list
+---
+
+## 7. Known Limitations
+
+- No real-time filesystem change detection (manual refresh only)
+- Playback: basic controls only (no equalizer, no queue/playlist)
+- Search: simple case-insensitive substring, no fuzzy matching
+- Supported formats: MP3, FLAC only

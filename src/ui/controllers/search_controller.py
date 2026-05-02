@@ -53,3 +53,18 @@ class SearchController(QObject):
             from ...core.events import SearchResultsChanged
 
             self._bus.publish(SearchResultsChanged(tracks=results, query=self._pending_query))
+
+    def filter_by_category(self, category: str | None) -> None:
+        """Emit results_changed with tracks matching `category` (case-insensitive),
+        or with all untagged tracks if `category is None`.
+        Cancels any pending debounced search.
+        """
+        self._timer.stop()
+        all_tracks = self._repo.get_all_tracks()
+        if category is None:
+            results = [t for t in all_tracks if not t.categories]
+        else:
+            target = category.lower()
+            results = [t for t in all_tracks if any(c.lower() == target for c in t.categories)]
+        self._pending_query = ""
+        self.results_changed.emit(results)

@@ -2,14 +2,17 @@
 
 from unittest.mock import MagicMock
 
+import pytest
+
 from src.core.categorizer import Categorizer
+from src.core.library import LibraryManager
 from src.models.track import Track
 
 
 def make_track(id=1, categories=None):
     return Track(
         id=id,
-        file_path="/tmp/track.mp3",
+        file_path=f"/tmp/track{id}.mp3",
         title="Test Track",
         artist="Artist",
         album="Album",
@@ -142,3 +145,139 @@ class TestCategorizerApplyCategories:
         categorizer.apply_categories(track, [])
         assert track.categories == []
         library.update_track.assert_called_once_with(track)
+
+
+@pytest.mark.unit
+class TestReplaceCategoriesEverywhere:
+    def _make_library(self, *tracks):
+        library = LibraryManager()
+        for t in tracks:
+            library.add_track(t)
+        return library
+
+    def test_rename_basic(self):
+        t1 = make_track(id=1, categories=["rock", "90s"])
+        t2 = make_track(id=2, categories=["jazz"])
+        library = self._make_library(t1, t2)
+        cat = Categorizer(library)
+
+        modified = cat.replace_categories_everywhere({"rock"}, "metal")
+
+        assert {t.id for t in modified} == {1}
+        assert library.get_track_by_id(1).categories == ["metal", "90s"]
+        assert library.get_track_by_id(1).comments == "metal 90s"
+        assert library.get_track_by_id(2).categories == ["jazz"]
+
+    def test_rename_case_insensitive_source_match(self):
+        t1 = make_track(id=1, categories=["Rock"])
+        library = self._make_library(t1)
+        cat = Categorizer(library)
+
+        modified = cat.replace_categories_everywhere({"ROCK"}, "metal")
+
+        assert len(modified) == 1
+        assert library.get_track_by_id(1).categories == ["metal"]
+
+    def test_rename_dedup_when_target_already_present(self):
+        t1 = make_track(id=1, categories=["rock", "metal"])
+        library = self._make_library(t1)
+        cat = Categorizer(library)
+
+        modified = cat.replace_categories_everywhere({"rock"}, "metal")
+
+        assert len(modified) == 1
+        assert library.get_track_by_id(1).categories == ["metal"]
+
+    def test_rename_comments_updated(self):
+        t1 = make_track(id=1, categories=["rock"])
+        library = self._make_library(t1)
+        cat = Categorizer(library)
+
+        cat.replace_categories_everywhere({"rock"}, "metal")
+
+        assert library.get_track_by_id(1).comments == "metal"
+
+    def test_merge_multiple_sources(self):
+        t1 = make_track(id=1, categories=["rock", "punk"])
+        t2 = make_track(id=2, categories=["punk"])
+        library = self._make_library(t1, t2)
+        cat = Categorizer(library)
+
+        modified = cat.replace_categories_everywhere({"rock", "punk"}, "metal")
+
+        assert {t.id for t in modified} == {1, 2}
+        assert library.get_track_by_id(1).categories == ["metal"]
+        assert library.get_track_by_id(2).categories == ["metal"]
+
+    def test_merge_target_in_sources_ignored(self):
+        t1 = make_track(id=1, categories=["rock", "metal"])
+        library = self._make_library(t1)
+        cat = Categorizer(library)
+
+        # metal is in both sources and target — should only replace rock
+        modified = cat.replace_categories_everywhere({"rock", "metal"}, "metal")
+
+        assert len(modified) == 1
+        assert library.get_track_by_id(1).categories == ["metal"]
+
+    def test_delete_removes_from_all_tracks(self):
+        t1 = make_track(id=1, categories=["rock", "90s"])
+        t2 = make_track(id=2, categories=["rock"])
+        library = self._make_library(t1, t2)
+        cat = Categorizer(library)
+
+        modified = cat.replace_categories_everywhere({"rock"}, None)
+
+        assert {t.id for t in modified} == {1, 2}
+        assert library.get_track_by_id(1).categories == ["90s"]
+        assert library.get_track_by_id(2).categories == []
+
+    def test_delete_case_insensitive(self):
+        t1 = make_track(id=1, categories=["Rock"])
+        library = self._make_library(t1)
+        cat = Categorizer(library)
+
+        cat.replace_categories_everywhere({"rock"}, None)
+
+        assert library.get_track_by_id(1).categories == []
+
+    def test_delete_no_matching_tracks_returns_empty(self):
+        t1 = make_track(id=1, categories=["jazz"])
+        library = self._make_library(t1)
+        cat = Categorizer(library)
+
+        result = cat.replace_categories_everywhere({"rock"}, None)
+
+        assert result == []
+        assert library.get_track_by_id(1).categories == ["jazz"]
+
+    def test_empty_target_raises_value_error(self):
+        library = self._make_library()
+        cat = Categorizer(library)
+
+        with pytest.raises(ValueError):
+            cat.replace_categories_everywhere({"rock"}, "")
+
+    def test_whitespace_target_raises_value_error(self):
+        library = self._make_library()
+        cat = Categorizer(library)
+
+        with pytest.raises(ValueError):
+            cat.replace_categories_everywhere({"rock"}, "hello world")
+
+    def test_none_target_is_valid(self):
+        library = self._make_library()
+        cat = Categorizer(library)
+        # Should not raise
+        result = cat.replace_categories_everywhere({"rock"}, None)
+        assert result == []
+
+    def test_no_matching_tracks_returns_empty_list(self):
+        t1 = make_track(id=1, categories=["jazz"])
+        library = self._make_library(t1)
+        cat = Categorizer(library)
+
+        result = cat.replace_categories_everywhere({"rock"}, "metal")
+
+        assert result == []
+        assert library.get_track_by_id(1).categories == ["jazz"]

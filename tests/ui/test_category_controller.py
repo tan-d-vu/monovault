@@ -337,3 +337,59 @@ class TestClearCategoriesBulk:
         ctrl.clear_categories_bulk([other])
 
         categorizer.get_suggestions.assert_not_called()
+
+
+@pytest.mark.unit
+class TestReplaceEverywhere:
+    def test_emits_signal_and_schedules_writes(self, qapp):
+        categorizer = MagicMock()
+        track1 = make_track(categories=["rock"])
+        track2 = make_track(categories=["rock"])
+        categorizer.replace_categories_everywhere.return_value = [track1, track2]
+        ctrl = make_ctrl(categorizer)
+
+        emitted = []
+        ctrl.categories_changed.connect(emitted.append)
+
+        result = ctrl.replace_everywhere({"rock"}, "metal")
+
+        assert result == [track1, track2]
+        assert emitted == [track1, track2]
+        assert ctrl._schedule_write.call_count == 2
+
+    def test_empty_modified_is_noop(self, qapp):
+        categorizer = MagicMock()
+        categorizer.replace_categories_everywhere.return_value = []
+        ctrl = make_ctrl(categorizer)
+
+        result = ctrl.replace_everywhere({"unknown"}, "x")
+
+        assert result == []
+        ctrl._schedule_write.assert_not_called()
+
+    def test_refreshes_suggestions_when_current_track_modified(self, qapp):
+        categorizer = MagicMock()
+        categorizer.get_suggestions.return_value = []
+        track = make_track(categories=["rock"])
+        categorizer.replace_categories_everywhere.return_value = [track]
+        ctrl = make_ctrl(categorizer)
+        ctrl.select_track(track)
+        categorizer.get_suggestions.reset_mock()
+
+        ctrl.replace_everywhere({"rock"}, "metal")
+
+        categorizer.get_suggestions.assert_called_once_with(track)
+
+    def test_does_not_refresh_suggestions_when_current_track_not_modified(self, qapp):
+        categorizer = MagicMock()
+        categorizer.get_suggestions.return_value = []
+        current = make_track(categories=["jazz"])
+        other = make_track(categories=["rock"])
+        categorizer.replace_categories_everywhere.return_value = [other]
+        ctrl = make_ctrl(categorizer)
+        ctrl.select_track(current)
+        categorizer.get_suggestions.reset_mock()
+
+        ctrl.replace_everywhere({"rock"}, "metal")
+
+        categorizer.get_suggestions.assert_not_called()

@@ -118,6 +118,29 @@ class CategoryController(QObject):
 
         return len(tracks_with_categories)
 
+    def replace_everywhere(self, sources: set[str], target: str | None) -> list[Track]:
+        """Apply rename/merge/delete via the categorizer, emit signals, schedule writes.
+
+        Returns the list of modified tracks so the caller can show a count.
+        Raises ValueError if target is invalid.
+        """
+        modified = self._categorizer.replace_categories_everywhere(sources, target)
+        if not modified:
+            return modified
+
+        for track in modified:
+            self.categories_changed.emit(track)
+            if self._bus:
+                from ...core.events import CategoriesChanged
+
+                self._bus.publish(CategoriesChanged(track=track))
+            self._schedule_write(track.file_path, track.categories)
+
+        if self._current_track and self._current_track in modified:
+            self._refresh_suggestions()
+
+        return modified
+
     def accept_suggestion(self, category: str) -> bool:
         return self.add_category(category)
 
