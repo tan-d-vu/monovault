@@ -15,6 +15,7 @@ class Track:
     folder_path: str
     comments: str = ""
     date_added: str = ""
+    bpm: float | None = None
 
     @property
     def filename(self) -> str:

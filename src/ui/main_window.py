@@ -18,6 +18,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from ..core.bpm_store import _MISSING, BpmStore
 from ..core.categorizer import Categorizer
 from ..core.category_sources import ArtistCategorySource, SimilarCategoryCategorySource
 from ..core.events import EventBus
@@ -46,6 +47,7 @@ from .panels import (
 from .scanner_worker import ScannerWorker
 from .styles import STYLESHEET
 from .widgets import Toast
+from .workers.bpm_worker import BpmWorker
 
 
 class MainWindow(QMainWindow):
@@ -64,11 +66,15 @@ class MainWindow(QMainWindow):
             ],
         )
 
+        self._bpm_stores: dict[str, BpmStore] = {}
+        self._bpm_worker: BpmWorker | None = None
+
         self.playback_ctrl = PlaybackController(self.playback_engine, bus=self._bus, parent=self)
         self.search_ctrl = SearchController(self.library, bus=self._bus, parent=self)
         self.category_ctrl = CategoryController(self.categorizer, bus=self._bus, parent=self)
         self.delete_ctrl = DeleteController(
-            self.library, self.playback_engine, self.scanner, parent=self
+            self.library, self.playback_engine, self.scanner,
+            bpm_stores=self._bpm_stores, parent=self
         )
 
         self.all_tracks: list[Track] = []
@@ -360,6 +366,11 @@ class MainWindow(QMainWindow):
 
         self._scan_announce_done = announce_done
 
+        if self._bpm_worker is not None and self._bpm_worker.isRunning():
+            self._bpm_worker.cancel()
+            self._bpm_worker.wait(2000)
+            self._bpm_worker = None
+
         thread = QThread(self)
         worker = ScannerWorker(self.scanner)
         worker.set_folders(live_folders)
@@ -393,7 +404,14 @@ class MainWindow(QMainWindow):
         self.scan_status_label.setText(f"Scanning {scanned}/{total} — {basename}")
 
     def _on_scan_folder_done(self, folder: str, tracks: list) -> None:
+        from pathlib import Path
+
+        bpm_store = BpmStore(Path(folder))
+        self._bpm_stores[folder] = bpm_store
         for track in tracks:
+            cached = bpm_store.get(track.file_path)
+            if cached is not _MISSING:
+                track.bpm = cached
             self.library.add_track(track)
         # Rebuild tree to show discovered subfolders
         all_tracks = self.library.get_all_tracks()
@@ -417,10 +435,71 @@ class MainWindow(QMainWindow):
             self._scan_announce_done = False
             QMessageBox.information(self, "Refresh Complete", "Library has been refreshed.")
 
+        self._start_bpm_analysis()
+
     def _on_scan_cancel_clicked(self) -> None:
         if self._scan_worker is not None:
             self._scan_worker.cancel()
             self.scan_status_label.setText("Cancelling...")
+
+    def _start_bpm_analysis(self) -> None:
+        from pathlib import Path
+
+        print("[BPM] _start_bpm_analysis called")
+        if self._bpm_worker is not None and self._bpm_worker.isRunning():
+            print("[BPM] worker already running, skipping")
+            return
+        all_tracks = self.library.get_all_tracks()
+        print(f"[BPM] total tracks in library: {len(all_tracks)}")
+        for track in all_tracks:
+            if track.folder_path not in self._bpm_stores:
+                self._bpm_stores[track.folder_path] = BpmStore(Path(track.folder_path))
+        uncached = [
+            t for t in all_tracks
+            if self._bpm_stores[t.folder_path].get(t.file_path) is _MISSING
+        ]
+        print(f"[BPM] uncached tracks: {len(uncached)}")
+        if not uncached:
+            print("[BPM] all tracks already cached, nothing to analyze")
+            return
+        worker = BpmWorker(uncached, self._bpm_stores)
+        worker.signals.track_analyzed.connect(
+            self._on_bpm_track_analyzed, Qt.ConnectionType.QueuedConnection
+        )
+        worker.signals.progress.connect(
+            self._on_bpm_progress, Qt.ConnectionType.QueuedConnection
+        )
+        worker.signals.finished.connect(
+            self._on_bpm_finished, Qt.ConnectionType.QueuedConnection
+        )
+        self._bpm_worker = worker
+        self.scan_status_label.setText("Analyzing BPM...")
+        self.scan_progress.setValue(0)
+        self.scan_progress.setMaximum(len(uncached))
+        self.scan_progress_bar.show()
+        print(f"[BPM] starting worker for {len(uncached)} tracks")
+        worker.start()
+
+    def _on_bpm_track_analyzed(self, track_id: int, bpm: object) -> None:
+        print(f"[BPM] track_analyzed signal received: track_id={track_id} bpm={bpm}")
+        track = self.library.get_track_by_id(track_id)
+        if track is not None:
+            track.bpm = bpm  # float | None
+            updated = self.track_table_manager.update_bpm(track_id, bpm)
+            print(f"[BPM] update_bpm({track_id}, {bpm}) → {updated}")
+        else:
+            print(f"[BPM] track {track_id} not found in library")
+
+    def _on_bpm_progress(self, done: int, total: int) -> None:
+        self.scan_progress.setMaximum(total)
+        self.scan_progress.setValue(done)
+        self.scan_status_label.setText(f"Analyzing BPM… {done}/{total}")
+
+    def _on_bpm_finished(self) -> None:
+        print("[BPM] worker finished")
+        self.scan_progress_bar.hide()
+        self.scan_status_label.setText("")
+        self._bpm_worker = None
 
     def _on_folder_context_menu(self, pos):
         item = self.folder_tree_widget.itemAt(pos)
@@ -758,6 +837,9 @@ class MainWindow(QMainWindow):
         self.category_stats_tab.invalidate()
 
     def closeEvent(self, event):
+        if self._bpm_worker is not None and self._bpm_worker.isRunning():
+            self._bpm_worker.cancel()
+            self._bpm_worker.wait(2000)
         if self._scan_worker is not None:
             self._scan_worker.cancel()
         if self._scan_thread is not None and self._scan_thread.isRunning():

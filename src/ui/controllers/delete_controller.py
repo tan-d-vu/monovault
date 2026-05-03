@@ -19,6 +19,7 @@ from pathlib import Path
 
 from PyQt6.QtCore import QObject, QUrl, pyqtSignal
 
+from ...core.bpm_store import BpmStore
 from ...core.library import LibraryManager
 from ...core.library_store import LibraryStore
 from ...core.playback import PlaybackEngine
@@ -43,12 +44,14 @@ class DeleteController(QObject):
         library: LibraryManager,
         playback: PlaybackEngine,
         scanner: Scanner,
+        bpm_stores: dict[str, BpmStore] | None = None,
         parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
         self._library = library
         self._playback = playback
         self._scanner = scanner
+        self._bpm_stores = bpm_stores or {}
         self._trash_managers: dict[str, TrashManager] = {}
 
     def delete_tracks(self, tracks: list[Track]) -> None:
@@ -128,6 +131,10 @@ class DeleteController(QObject):
         for folder_path, entry in entries:
             trash = self._trash_manager_for(folder_path)
             trash.purge(entry.trash_id)
+            bpm_store = self._bpm_stores.get(folder_path)
+            if bpm_store is not None:
+                original_abs = str(Path(folder_path) / entry.original_relpath)
+                bpm_store.remove(original_abs)
         self.trash_changed.emit()
 
     def empty_trash(self) -> None:

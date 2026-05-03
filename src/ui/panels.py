@@ -1,7 +1,6 @@
 """UI panels — folder tree, track table, details panel, playback bar."""
 
 import os
-from enum import IntEnum
 from typing import TYPE_CHECKING
 
 from PyQt6.QtCore import Qt
@@ -31,38 +30,6 @@ if TYPE_CHECKING:
 from ..models.track import Track
 from .styles import THEME
 from .widgets import CategoryPill, SuggestionButton
-
-
-class TrackTableColumn(IntEnum):
-    NUMBER = 0
-    TITLE = 1
-    ARTIST = 2
-    DURATION = 3
-    COMMENTS = 4
-    LOCATION = 5
-    DATE_ADDED = 6
-    COUNT = 7
-
-
-_COLUMN_LABELS = [
-    "#",
-    "Title",
-    "Artist",
-    "Duration",
-    "Comments",
-    "Location",
-    "Date Added",
-]
-
-_COLUMN_RESIZE_MODES: dict[TrackTableColumn, QHeaderView.ResizeMode] = {
-    TrackTableColumn.NUMBER: QHeaderView.ResizeMode.ResizeToContents,
-    TrackTableColumn.TITLE: QHeaderView.ResizeMode.ResizeToContents,
-    TrackTableColumn.ARTIST: QHeaderView.ResizeMode.ResizeToContents,
-    TrackTableColumn.DURATION: QHeaderView.ResizeMode.ResizeToContents,
-    TrackTableColumn.COMMENTS: QHeaderView.ResizeMode.Stretch,
-    TrackTableColumn.LOCATION: QHeaderView.ResizeMode.Fixed,
-    TrackTableColumn.DATE_ADDED: QHeaderView.ResizeMode.Interactive,
-}
 
 
 def create_track_table() -> tuple[QWidget, QLineEdit, QTableWidget, "TrackTableManager"]:

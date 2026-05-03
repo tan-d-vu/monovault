@@ -1,5 +1,7 @@
 """Track table components for the MusicVault UI."""
 
+from collections.abc import Callable
+from dataclasses import dataclass
 from enum import IntEnum
 from typing import Protocol
 
@@ -22,41 +24,7 @@ class TrackTableColumn(IntEnum):
     COMMENTS = 4
     LOCATION = 5
     DATE_ADDED = 6
-    COUNT = 7
-
-
-_COLUMN_LABELS = [
-    "#",
-    "Title",
-    "Artist",
-    "Duration",
-    "Comments",
-    "Location",
-    "Date Added",
-]
-
-_COLUMN_RESIZE_MODES: dict[TrackTableColumn, QHeaderView.ResizeMode] = {
-    TrackTableColumn.NUMBER: QHeaderView.ResizeMode.ResizeToContents,
-    TrackTableColumn.TITLE: QHeaderView.ResizeMode.ResizeToContents,
-    TrackTableColumn.ARTIST: QHeaderView.ResizeMode.ResizeToContents,
-    TrackTableColumn.DURATION: QHeaderView.ResizeMode.ResizeToContents,
-    TrackTableColumn.COMMENTS: QHeaderView.ResizeMode.Stretch,
-    TrackTableColumn.LOCATION: QHeaderView.ResizeMode.Fixed,
-    TrackTableColumn.DATE_ADDED: QHeaderView.ResizeMode.Interactive,
-}
-
-_PADDING_MAP = {
-    TrackTableColumn.NUMBER: 8,
-    TrackTableColumn.TITLE: 4,
-    TrackTableColumn.ARTIST: 4,
-    TrackTableColumn.DURATION: 4,
-    TrackTableColumn.COMMENTS: 4,
-    TrackTableColumn.LOCATION: 30,
-    TrackTableColumn.DATE_ADDED: 30,
-}
-
-# Extra padding for header text minimum (accounts for sort indicator arrow)
-_HEADER_MIN_PADDING = 24
+    BPM = 7
 
 
 class _NumericItem(QTableWidgetItem):
@@ -67,6 +35,78 @@ class _NumericItem(QTableWidgetItem):
             return int(self.text()) < int(other.text())
         except ValueError:
             return super().__lt__(other)
+
+
+@dataclass
+class ColumnSpec:
+    label: str
+    resize_mode: QHeaderView.ResizeMode
+    padding: int
+    get_value: Callable[[Track, int], str]
+    alignment: Qt.AlignmentFlag | None = None
+    item_class: type[QTableWidgetItem] = QTableWidgetItem
+    skip_width_calc: bool = False
+
+
+COLUMN_SPECS: dict[TrackTableColumn, ColumnSpec] = {
+    TrackTableColumn.NUMBER: ColumnSpec(
+        label="#",
+        resize_mode=QHeaderView.ResizeMode.ResizeToContents,
+        padding=8,
+        get_value=lambda t, i: str(i + 1),
+        alignment=Qt.AlignmentFlag.AlignCenter,
+        item_class=_NumericItem,
+    ),
+    TrackTableColumn.TITLE: ColumnSpec(
+        label="Title",
+        resize_mode=QHeaderView.ResizeMode.ResizeToContents,
+        padding=4,
+        get_value=lambda t, i: t.title,
+    ),
+    TrackTableColumn.ARTIST: ColumnSpec(
+        label="Artist",
+        resize_mode=QHeaderView.ResizeMode.ResizeToContents,
+        padding=4,
+        get_value=lambda t, i: t.artist,
+    ),
+    TrackTableColumn.DURATION: ColumnSpec(
+        label="Duration",
+        resize_mode=QHeaderView.ResizeMode.ResizeToContents,
+        padding=4,
+        get_value=lambda t, i: t.duration_formatted,
+        alignment=Qt.AlignmentFlag.AlignCenter,
+    ),
+    TrackTableColumn.COMMENTS: ColumnSpec(
+        label="Comments",
+        resize_mode=QHeaderView.ResizeMode.Stretch,
+        padding=4,
+        get_value=lambda t, i: t.comments or "",
+        skip_width_calc=True,
+    ),
+    TrackTableColumn.LOCATION: ColumnSpec(
+        label="Location",
+        resize_mode=QHeaderView.ResizeMode.Fixed,
+        padding=30,
+        get_value=lambda t, i: t.location,
+    ),
+    TrackTableColumn.DATE_ADDED: ColumnSpec(
+        label="Date Added",
+        resize_mode=QHeaderView.ResizeMode.Interactive,
+        padding=30,
+        get_value=lambda t, i: t.date_added or "",
+        alignment=Qt.AlignmentFlag.AlignCenter,
+    ),
+    TrackTableColumn.BPM: ColumnSpec(
+        label="~BPM",
+        resize_mode=QHeaderView.ResizeMode.ResizeToContents,
+        padding=8,
+        get_value=lambda t, i: str(round(t.bpm)) if t.bpm is not None else "",
+        alignment=Qt.AlignmentFlag.AlignCenter,
+        item_class=_NumericItem,
+    ),
+}
+
+_HEADER_MIN_PADDING = 24
 
 
 class ITrackTable(Protocol):
@@ -84,8 +124,8 @@ class TrackTableManager:
         self._setup_table()
 
     def _setup_table(self) -> None:
-        self._table.setColumnCount(TrackTableColumn.COUNT)
-        self._table.setHorizontalHeaderLabels(_COLUMN_LABELS)
+        self._table.setColumnCount(len(COLUMN_SPECS))
+        self._table.setHorizontalHeaderLabels([spec.label for spec in COLUMN_SPECS.values()])
         self._table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self._table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self._table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -100,8 +140,9 @@ class TrackTableManager:
         self._header: QHeaderView = header
         self._header.setStretchLastSection(False)
         self._header.setSortIndicatorShown(True)
-        for col, mode in _COLUMN_RESIZE_MODES.items():
-            self._header.setSectionResizeMode(col, mode)
+        self._header.setSectionsMovable(True)
+        for col, spec in COLUMN_SPECS.items():
+            self._header.setSectionResizeMode(col, spec.resize_mode)
         self._header.sectionClicked.connect(self._on_header_clicked)
 
     def _on_header_clicked(self, col: int) -> None:
@@ -155,51 +196,45 @@ class TrackTableManager:
         comments_item = self._table.item(row, TrackTableColumn.COMMENTS)
         if comments_item is not None:
             comments_item.setText(" ".join(track.categories))
-        for col in range(TrackTableColumn.COUNT):
+        for col in COLUMN_SPECS:
             item = self._table.item(row, col)
             if item is not None:
                 item.setData(Qt.ItemDataRole.UserRole, track)
         return True
 
+    def update_bpm(self, track_id: int, bpm: float | None) -> bool:
+        row = self._row_by_track_id.get(track_id)
+        if row is None:
+            return False
+        spec = COLUMN_SPECS[TrackTableColumn.BPM]
+        text = str(round(bpm)) if bpm is not None else ""
+        item = spec.item_class(text)
+        if spec.alignment is not None:
+            item.setTextAlignment(spec.alignment)
+        num_item = self._table.item(row, TrackTableColumn.NUMBER)
+        if num_item is not None:
+            item.setData(Qt.ItemDataRole.UserRole, num_item.data(Qt.ItemDataRole.UserRole))
+        self._table.setItem(row, TrackTableColumn.BPM, item)
+        return True
+
     def _set_row(self, row: int, track: Track) -> None:
-        num_item = _NumericItem(str(row + 1))
-        num_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._table.setItem(row, TrackTableColumn.NUMBER, num_item)
-
-        self._table.setItem(row, TrackTableColumn.TITLE, QTableWidgetItem(track.title))
-        self._table.setItem(row, TrackTableColumn.ARTIST, QTableWidgetItem(track.artist))
-
-        dur_item = QTableWidgetItem(track.duration_formatted)
-        dur_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._table.setItem(row, TrackTableColumn.DURATION, dur_item)
-
-        self._table.setItem(row, TrackTableColumn.COMMENTS, QTableWidgetItem(track.comments or ""))
-        self._table.setItem(row, TrackTableColumn.LOCATION, QTableWidgetItem(track.location))
-
-        added_item = QTableWidgetItem(track.date_added or "")
-        added_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-        added_item.setData(
-            Qt.ItemDataRole.TextAlignmentRole,
-            int(Qt.AlignmentFlag.AlignCenter) | int(Qt.AlignmentFlag.AlignVCenter),
-        )
-        self._table.setItem(row, TrackTableColumn.DATE_ADDED, added_item)
-
-        for col in range(TrackTableColumn.COUNT):
-            item = self._table.item(row, col)
-            if item:
-                item.setData(Qt.ItemDataRole.UserRole, track)
-
-        self._row_by_track_id[track.id] = row
+        for col, spec in COLUMN_SPECS.items():
+            text = spec.get_value(track, row)
+            item = spec.item_class(text)
+            if spec.alignment is not None:
+                item.setTextAlignment(spec.alignment)
+            item.setData(Qt.ItemDataRole.UserRole, track)
+            self._table.setItem(row, col, item)
 
     def _calculate_column_widths(self, tracks: list[Track]) -> None:
         header_fm = self._header.fontMetrics()
         content_fm = self._header.fontMetrics()
 
-        for col in TrackTableColumn:
-            if col in (TrackTableColumn.COMMENTS, TrackTableColumn.COUNT):
+        for col, spec in COLUMN_SPECS.items():
+            if spec.skip_width_calc:
                 continue
 
-            header_text_width = header_fm.boundingRect(_COLUMN_LABELS[col]).width()
+            header_text_width = header_fm.boundingRect(spec.label).width()
             min_width = header_text_width + _HEADER_MIN_PADDING
 
             max_width = min_width
@@ -207,7 +242,7 @@ class TrackTableManager:
                 item = self._table.item(row, col)
                 if item:
                     content_width = content_fm.boundingRect(item.text()).width()
-                    max_width = max(max_width, content_width + _PADDING_MAP[col])
+                    max_width = max(max_width, content_width + spec.padding)
 
             self._table.setColumnWidth(col, max_width)
 

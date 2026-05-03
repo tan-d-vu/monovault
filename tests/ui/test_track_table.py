@@ -4,7 +4,7 @@ import pytest
 from PyQt6.QtWidgets import QTableWidget
 
 from src.models.track import Track
-from src.ui.track_table import TrackTableColumn, TrackTableManager
+from src.ui.track_table import COLUMN_SPECS, TrackTableColumn, TrackTableManager
 
 
 def _make_track(track_id: int, title: str, artist: str = "Artist") -> Track:
@@ -112,7 +112,7 @@ def test_update_track_refreshes_userrole_on_all_columns(qapp, five_tracks):
 
     from PyQt6.QtCore import Qt
 
-    for col in range(TrackTableColumn.COUNT):
+    for col in COLUMN_SPECS:
         item = table.item(2, col)
         assert item is not None
         stored = item.data(Qt.ItemDataRole.UserRole)
