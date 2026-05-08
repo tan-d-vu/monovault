@@ -212,6 +212,7 @@ class MainWindow(QMainWindow):
         self.volume_slider.sliderMoved.connect(self.playback_ctrl.set_volume)
 
         self.search_ctrl.results_changed.connect(self._on_search_results)
+        self.track_table_manager.date_filter_changed.connect(self.search_ctrl.set_date_filter)
 
         self.category_ctrl.categories_changed.connect(self._on_categories_changed)
         self.category_ctrl.suggestions_changed.connect(self._on_suggestions_changed)
@@ -797,14 +798,9 @@ class MainWindow(QMainWindow):
             self.category_stats_tab.show_if_dirty()
 
     def _on_category_filter_requested(self, category: str) -> None:
-        cat = None if category == UNTAGGED_SENTINEL else category
-        self.search_ctrl.filter_by_category(cat)
+        query = 'category:""' if category == UNTAGGED_SENTINEL else f'category:"{category}"'
         self._tabs.setCurrentIndex(0)
-        self.search_input.blockSignals(True)
-        self.search_input.clear()
-        self.search_input.blockSignals(False)
-        label = "untagged tracks" if cat is None else f'category "{cat}"'
-        self.statusBar().showMessage(f"Filtered to {label}", 5000)
+        self.search_input.setText(query)
 
     def _on_category_rename_requested(self, old: str, new: str) -> None:
         try:

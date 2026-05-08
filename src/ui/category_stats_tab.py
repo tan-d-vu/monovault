@@ -55,7 +55,7 @@ class CategoryStatsTab(QWidget):
 
         top_bar = QHBoxLayout()
         self._search_input = QLineEdit()
-        self._search_input.setPlaceholderText("Filter categories...")
+        self._search_input.setPlaceholderText("Search categories...")
         self._refresh_btn = QPushButton("Refresh")
         self._summary_label = QLabel("")
         top_bar.addWidget(self._search_input)
@@ -80,8 +80,16 @@ class CategoryStatsTab(QWidget):
         self._configure_table(self._pairs_table)
         self._pairs_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
 
+        pairs_panel = QWidget()
+        pairs_layout = QVBoxLayout(pairs_panel)
+        pairs_layout.setContentsMargins(0, 0, 0, 0)
+        pairs_layout.setSpacing(2)
+        pairs_label = QLabel("Category Pairs")
+        pairs_layout.addWidget(pairs_label)
+        pairs_layout.addWidget(self._pairs_table)
+
         self._splitter.addWidget(self._category_table)
-        self._splitter.addWidget(self._pairs_table)
+        self._splitter.addWidget(pairs_panel)
         self._splitter.setSizes([400, 300])
         self._splitter.setStretchFactor(0, 1)
         self._splitter.setStretchFactor(1, 0)
@@ -114,7 +122,10 @@ class CategoryStatsTab(QWidget):
             header.setStretchLastSection(True)
 
     def invalidate(self) -> None:
-        self._dirty = True
+        if self.isVisible():
+            self.refresh()
+        else:
+            self._dirty = True
 
     def refresh(self) -> None:
         self._stats = compute_stats(self._library.get_all_tracks())
@@ -153,6 +164,8 @@ class CategoryStatsTab(QWidget):
                 count_item = _NumericItem(str(count))
                 flag = "⚠" if count <= self._orphan_threshold else ""
                 flag_item = QTableWidgetItem(flag)
+                if flag:
+                    flag_item.setToolTip("Used on ≤1 track")
                 self._category_table.setItem(row, 0, name_item)
                 self._category_table.setItem(row, 1, count_item)
                 self._category_table.setItem(row, 2, flag_item)

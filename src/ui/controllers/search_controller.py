@@ -2,8 +2,10 @@
 
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
+from ...core.date_filter import DatePreset, apply_date_filter
 from ...core.events import EventBus
 from ...core.interfaces import ITrackRepository
+from ...core.query_parser import evaluate, parse
 from ...models.track import Track
 
 
@@ -27,6 +29,7 @@ class SearchController(QObject):
         self._timer.timeout.connect(self._execute_search)
         self._debounce_ms = debounce_ms
         self._pending_query: str = ""
+        self._date_preset: DatePreset | None = None
 
     def on_text_changed(self, text: str) -> None:
         self._pending_query = text.strip()
@@ -34,37 +37,30 @@ class SearchController(QObject):
 
     def search_immediate(self, query: str) -> list[Track]:
         self._timer.stop()
-        q = query.strip()
-        if q:
-            results = self._repo.search(q)
-        else:
-            results = self._repo.get_all_tracks()
-        self.results_changed.emit(results)
-        return results
+        self._pending_query = query.strip()
+        return self._apply_filters()
 
     def get_all_tracks(self) -> list[Track]:
-        results = self._repo.get_all_tracks()
-        self.results_changed.emit(results)
-        return results
+        tracks = apply_date_filter(self._repo.get_all_tracks(), self._date_preset)
+        self.results_changed.emit(tracks)
+        return tracks
+
+    def set_date_filter(self, preset: DatePreset | None) -> None:
+        self._date_preset = preset
+        self._apply_filters()
+
+    def _apply_filters(self) -> list[Track]:
+        node = parse(self._pending_query)
+        tracks = self._repo.get_all_tracks()
+        if node is not None:
+            tracks = [t for t in tracks if evaluate(node, t)]
+        tracks = apply_date_filter(tracks, self._date_preset)
+        self.results_changed.emit(tracks)
+        return tracks
 
     def _execute_search(self) -> None:
-        results = self.search_immediate(self._pending_query)
+        results = self._apply_filters()
         if self._bus:
             from ...core.events import SearchResultsChanged
 
             self._bus.publish(SearchResultsChanged(tracks=results, query=self._pending_query))
-
-    def filter_by_category(self, category: str | None) -> None:
-        """Emit results_changed with tracks matching `category` (case-insensitive),
-        or with all untagged tracks if `category is None`.
-        Cancels any pending debounced search.
-        """
-        self._timer.stop()
-        all_tracks = self._repo.get_all_tracks()
-        if category is None:
-            results = [t for t in all_tracks if not t.categories]
-        else:
-            target = category.lower()
-            results = [t for t in all_tracks if any(c.lower() == target for c in t.categories)]
-        self._pending_query = ""
-        self.results_changed.emit(results)

@@ -5,14 +5,16 @@ from dataclasses import dataclass
 from enum import IntEnum
 from typing import Protocol
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QObject, QPoint, Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QHeaderView,
+    QMenu,
     QTableWidget,
     QTableWidgetItem,
 )
 
+from ..core.date_filter import DatePreset
 from ..models.track import Track
 
 
@@ -114,13 +116,17 @@ class ITrackTable(Protocol):
     def clear(self) -> None: ...
 
 
-class TrackTableManager:
-    def __init__(self, table: QTableWidget) -> None:
+class TrackTableManager(QObject):
+    date_filter_changed = pyqtSignal(object)  # DatePreset | None
+
+    def __init__(self, table: QTableWidget, parent: QObject | None = None) -> None:
+        super().__init__(parent)
         self._table = table
         self._last_tracks: list[Track] = []
         self._sort_column: int | None = None
         self._sort_order: Qt.SortOrder | None = None
         self._row_by_track_id: dict[int, int] = {}
+        self._active_date_preset: DatePreset | None = None
         self._setup_table()
 
     def _setup_table(self) -> None:
@@ -144,6 +150,8 @@ class TrackTableManager:
         for col, spec in COLUMN_SPECS.items():
             self._header.setSectionResizeMode(col, spec.resize_mode)
         self._header.sectionClicked.connect(self._on_header_clicked)
+        self._header.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self._header.customContextMenuRequested.connect(self._on_header_context_menu)
 
     def _on_header_clicked(self, col: int) -> None:
         header = self._header
@@ -245,6 +253,26 @@ class TrackTableManager:
                     max_width = max(max_width, content_width + spec.padding)
 
             self._table.setColumnWidth(col, max_width)
+
+    def _on_header_context_menu(self, pos: QPoint) -> None:
+        logical_col = self._header.logicalIndexAt(pos)
+        if logical_col != TrackTableColumn.DATE_ADDED:
+            return
+        menu = QMenu()
+        for preset in DatePreset:
+            action = menu.addAction(preset.value)
+            action.setCheckable(True)
+            action.setChecked(self._active_date_preset == preset)
+            action.triggered.connect(lambda checked, p=preset: self._set_date_preset(p))
+        menu.addSeparator()
+        clear_action = menu.addAction("Clear date filter")
+        clear_action.setEnabled(self._active_date_preset is not None)
+        clear_action.triggered.connect(lambda: self._set_date_preset(None))
+        menu.exec(self._header.mapToGlobal(pos))
+
+    def _set_date_preset(self, preset: DatePreset | None) -> None:
+        self._active_date_preset = preset
+        self.date_filter_changed.emit(preset)
 
     def clear(self) -> None:
         self._table.setRowCount(0)
