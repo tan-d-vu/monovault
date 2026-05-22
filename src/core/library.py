@@ -66,19 +66,6 @@ class LibraryManager:
                 return track
         return None
 
-    def search(self, query: str) -> list[Track]:
-        q = query.lower()
-        results = []
-        for track in self.tracks.values():
-            if (
-                q in track.title.lower()
-                or q in track.artist.lower()
-                or q in track.album.lower()
-                or any(q in cat.lower() for cat in track.categories)
-            ):
-                results.append(track)
-        return results
-
     def get_tracks_by_artist(self, artist: str) -> list[Track]:
         return [t for t in self.tracks.values() if t.artist.lower() == artist.lower()]
 

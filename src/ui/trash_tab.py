@@ -1,13 +1,18 @@
-"""Trash tab — inline view of trashed tracks, replacing the modal TrashDialog.
+"""Trash tab — inline view of trashed tracks.
 
 Shows trash entries from every watched folder's .monovault/trash/manifest.json
 in a single flat table.  Users can multi-select and Restore, Delete Permanently,
 or Empty Trash without leaving the main window.
+
+Double-click or Enter on a row plays the trashed file via the play_requested
+signal so users can preview before deciding to restore or purge.
 """
 
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt
+from pathlib import Path
+
+from PyQt6.QtCore import QEvent, Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QHBoxLayout,
@@ -25,11 +30,21 @@ from ..core.trash import TrashEntry
 from .controllers.delete_controller import DeleteController
 
 
+def _fmt_duration(seconds: float) -> str:
+    s = int(seconds)
+    return f"{s // 60:02d}:{s % 60:02d}"
+
+
 class TrashTab(QWidget):
     COLUMN_TITLE = 0
     COLUMN_ARTIST = 1
-    COLUMN_FOLDER = 2
-    COLUMN_DELETED_AT = 3
+    COLUMN_ALBUM = 2
+    COLUMN_DURATION = 3
+    COLUMN_CATEGORIES = 4
+    COLUMN_ORIGINAL_PATH = 5
+    COLUMN_DELETED_AT = 6
+
+    play_requested = pyqtSignal(str, str)  # (trash_file_path, display_label)
 
     def __init__(self, delete_ctrl: DeleteController, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -46,17 +61,27 @@ class TrashTab(QWidget):
         self._status_label = QLabel("")
         layout.addWidget(self._status_label)
 
-        self._table = QTableWidget(0, 4, self)
-        self._table.setHorizontalHeaderLabels(["Title", "Artist", "Folder", "Deleted"])
+        self._table = QTableWidget(0, 7, self)
+        self._table.setHorizontalHeaderLabels(
+            ["Title", "Artist", "Album", "Duration", "Categories", "Original Path", "Deleted At"]
+        )
         self._table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self._table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self._table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self._table.setAlternatingRowColors(True)
         self._table.verticalHeader().setVisible(False)
+        self._table.installEventFilter(self)
+        self._table.itemDoubleClicked.connect(self._on_double_clicked)
+
         header = self._table.horizontalHeader()
         header.setSectionResizeMode(self.COLUMN_TITLE, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(self.COLUMN_ARTIST, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(self.COLUMN_FOLDER, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(self.COLUMN_ALBUM, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(self.COLUMN_DURATION, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(self.COLUMN_CATEGORIES, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(
+            self.COLUMN_ORIGINAL_PATH, QHeaderView.ResizeMode.ResizeToContents
+        )
         header.setSectionResizeMode(
             self.COLUMN_DELETED_AT, QHeaderView.ResizeMode.ResizeToContents
         )
@@ -86,22 +111,34 @@ class TrashTab(QWidget):
 
         for row_index, (folder_path, entry) in enumerate(self._rows):
             watched = self._delete_ctrl.is_folder_watched(folder_path)
-            folder_label = folder_path if watched else f"{folder_path} (not watched)"
+            original_abs = str(Path(folder_path) / entry.original_relpath)
 
             title_item = QTableWidgetItem(entry.title or entry.original_relpath)
             title_item.setData(Qt.ItemDataRole.UserRole, row_index)
             artist_item = QTableWidgetItem(entry.artist)
-            folder_item = QTableWidgetItem(folder_label)
+            album_item = QTableWidgetItem(entry.album)
+            duration_item = QTableWidgetItem(_fmt_duration(entry.duration))
+            duration_item.setTextAlignment(
+                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+            )
+            categories_item = QTableWidgetItem(", ".join(entry.categories))
+            path_item = QTableWidgetItem(original_abs)
             deleted_item = QTableWidgetItem(entry.deleted_at)
 
             if not watched:
                 tooltip = "Source folder is no longer watched — cannot restore"
-                for cell in (title_item, artist_item, folder_item, deleted_item):
+                for cell in (
+                    title_item, artist_item, album_item, duration_item,
+                    categories_item, path_item, deleted_item,
+                ):
                     cell.setToolTip(tooltip)
 
             self._table.setItem(row_index, self.COLUMN_TITLE, title_item)
             self._table.setItem(row_index, self.COLUMN_ARTIST, artist_item)
-            self._table.setItem(row_index, self.COLUMN_FOLDER, folder_item)
+            self._table.setItem(row_index, self.COLUMN_ALBUM, album_item)
+            self._table.setItem(row_index, self.COLUMN_DURATION, duration_item)
+            self._table.setItem(row_index, self.COLUMN_CATEGORIES, categories_item)
+            self._table.setItem(row_index, self.COLUMN_ORIGINAL_PATH, path_item)
             self._table.setItem(row_index, self.COLUMN_DELETED_AT, deleted_item)
 
         count = len(self._rows)
@@ -163,3 +200,25 @@ class TrashTab(QWidget):
         )
         if reply == QMessageBox.StandardButton.Yes:
             self._delete_ctrl.empty_trash()
+
+    def _on_double_clicked(self, item) -> None:
+        self._play_selected()
+
+    def eventFilter(self, obj, event) -> bool:
+        if obj == self._table and event.type() == QEvent.Type.KeyPress:
+            if event.key() in (Qt.Key.Key_Enter, Qt.Key.Key_Return):
+                self._play_selected()
+                return True
+        return super().eventFilter(obj, event)
+
+    def _play_selected(self) -> None:
+        selected = self._table.selectedItems()
+        if not selected:
+            return
+        row = selected[0].row()
+        if row < 0 or row >= len(self._rows):
+            return
+        folder_path, entry = self._rows[row]
+        trash_file = Path(folder_path) / ".monovault" / "trash" / entry.trash_filename
+        label = f"{entry.title} - {entry.artist}" if entry.artist else entry.title
+        self.play_requested.emit(str(trash_file), label)

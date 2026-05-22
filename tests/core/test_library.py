@@ -186,41 +186,6 @@ class TestLibraryManager:
         assert removed[0].file_path == "/tmp/real.mp3"
 
     # ------------------------------------------------------------------
-    # search
-    # ------------------------------------------------------------------
-
-    @pytest.mark.unit
-    def test_search_by_title(self, library: LibraryManager, sample_track: Track) -> None:
-        library.add_track(sample_track)
-        results = library.search("Test Song")
-        assert len(results) == 1
-        assert results[0].title == sample_track.title
-
-    @pytest.mark.unit
-    def test_search_by_artist(self, library: LibraryManager, sample_track: Track) -> None:
-        library.add_track(sample_track)
-        results = library.search("Test Artist")
-        assert any(t.artist == "Test Artist" for t in results)
-
-    @pytest.mark.unit
-    def test_search_by_category(self, library: LibraryManager, sample_track: Track) -> None:
-        library.add_track(sample_track)
-        results = library.search("rock")
-        assert len(results) >= 1
-
-    @pytest.mark.unit
-    def test_search_case_insensitive(self, library: LibraryManager, sample_track: Track) -> None:
-        library.add_track(sample_track)
-        results = library.search("TEST SONG")
-        assert len(results) == 1
-
-    @pytest.mark.unit
-    def test_search_no_results(self, library: LibraryManager, sample_track: Track) -> None:
-        library.add_track(sample_track)
-        results = library.search("zzznomatch999")
-        assert results == []
-
-    # ------------------------------------------------------------------
     # get_tracks_by_artist
     # ------------------------------------------------------------------
 

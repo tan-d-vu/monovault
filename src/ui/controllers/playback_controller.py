@@ -61,6 +61,19 @@ class PlaybackController(QObject):
 
             self._bus.publish(TrackPlaybackStarted(track=track))
 
+    def play_file(self, file_path: str, label: str) -> None:
+        """Play an arbitrary file by path with a given display label.
+
+        Used for files not in the library (e.g., previewing trashed tracks).
+        prev_track / next_track are no-ops while a non-library file is playing.
+        """
+        self._current_track = None
+        self._track_list = []
+        self._engine.load_track(file_path)
+        self._engine.play()
+        self.play_state_changed.emit(True)
+        self.now_playing_changed.emit(label)
+
     def toggle_playback(self) -> None:
         if self._engine.is_playing():
             self._engine.pause()

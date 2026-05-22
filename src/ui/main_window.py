@@ -236,6 +236,8 @@ class MainWindow(QMainWindow):
         self.delete_ctrl.restore_completed.connect(self._on_restore_completed)
         self.delete_ctrl.restore_failed.connect(self._on_restore_failed)
 
+        self.trash_tab.play_requested.connect(self.playback_ctrl.play_file)
+
     def _connect_shortcuts(self) -> None:
         QShortcut(QKeySequence("Ctrl+F"), self).activated.connect(self.search_input.setFocus)
         QShortcut(QKeySequence("Ctrl+R"), self).activated.connect(self._refresh_library)
@@ -454,12 +456,9 @@ class MainWindow(QMainWindow):
     def _start_bpm_analysis(self) -> None:
         from pathlib import Path
 
-        print("[BPM] _start_bpm_analysis called")
         if self._bpm_worker is not None and self._bpm_worker.isRunning():
-            print("[BPM] worker already running, skipping")
             return
         all_tracks = self.library.get_all_tracks()
-        print(f"[BPM] total tracks in library: {len(all_tracks)}")
         for track in all_tracks:
             if track.folder_path not in self._bpm_stores:
                 self._bpm_stores[track.folder_path] = BpmStore(Path(track.folder_path))
@@ -467,9 +466,7 @@ class MainWindow(QMainWindow):
             t for t in all_tracks
             if self._bpm_stores[t.folder_path].get(t.file_path) is _MISSING
         ]
-        print(f"[BPM] uncached tracks: {len(uncached)}")
         if not uncached:
-            print("[BPM] all tracks already cached, nothing to analyze")
             return
         worker = BpmWorker(uncached, self._bpm_stores)
         worker.signals.track_analyzed.connect(
@@ -486,18 +483,13 @@ class MainWindow(QMainWindow):
         self.scan_progress.setValue(0)
         self.scan_progress.setMaximum(len(uncached))
         self.scan_progress_bar.show()
-        print(f"[BPM] starting worker for {len(uncached)} tracks")
         worker.start()
 
     def _on_bpm_track_analyzed(self, track_id: int, bpm: object) -> None:
-        print(f"[BPM] track_analyzed signal received: track_id={track_id} bpm={bpm}")
         track = self.library.get_track_by_id(track_id)
         if track is not None:
             track.bpm = bpm  # float | None
-            updated = self.track_table_manager.update_bpm(track_id, bpm)
-            print(f"[BPM] update_bpm({track_id}, {bpm}) → {updated}")
-        else:
-            print(f"[BPM] track {track_id} not found in library")
+            self.track_table_manager.update_bpm(track_id, bpm)
 
     def _on_bpm_progress(self, done: int, total: int) -> None:
         self.scan_progress.setMaximum(total)
@@ -505,7 +497,6 @@ class MainWindow(QMainWindow):
         self.scan_status_label.setText(f"Analyzing BPM… {done}/{total}")
 
     def _on_bpm_finished(self) -> None:
-        print("[BPM] worker finished")
         self.scan_progress_bar.hide()
         self.scan_status_label.setText("")
         self._bpm_worker = None
