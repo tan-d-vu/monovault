@@ -15,6 +15,7 @@ class PlaybackController(QObject):
     position_updated = pyqtSignal(int, int)
     time_display_changed = pyqtSignal(str)
     slider_position_changed = pyqtSignal(int)
+    mute_changed = pyqtSignal(bool)  # True = muted
 
     def __init__(
         self,
@@ -90,6 +91,11 @@ class PlaybackController(QObject):
 
     def set_volume(self, value: int) -> None:
         self._engine.set_volume(value)
+
+    def toggle_mute(self) -> None:
+        muted = not self._engine.is_muted()
+        self._engine.set_muted(muted)
+        self.mute_changed.emit(muted)
 
     def next_track(self) -> None:
         if not self._track_list or not self._current_track:

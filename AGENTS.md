@@ -79,6 +79,9 @@ monovault/
 # Activate venv (Linux/macOS)
 source venv/bin/activate
 
+# Windows
+.\.venv\Scripts\activate
+
 # Install dependencies (including dev)
 pip install -e ".[dev]"
 

@@ -47,13 +47,12 @@ class ColumnSpec:
     get_value: Callable[[Track, int], str]
     alignment: Qt.AlignmentFlag | None = None
     item_class: type[QTableWidgetItem] = QTableWidgetItem
-    skip_width_calc: bool = False
 
 
 COLUMN_SPECS: dict[TrackTableColumn, ColumnSpec] = {
     TrackTableColumn.NUMBER: ColumnSpec(
         label="#",
-        resize_mode=QHeaderView.ResizeMode.ResizeToContents,
+        resize_mode=QHeaderView.ResizeMode.Interactive,
         padding=8,
         get_value=lambda t, i: str(i + 1),
         alignment=Qt.AlignmentFlag.AlignCenter,
@@ -61,33 +60,32 @@ COLUMN_SPECS: dict[TrackTableColumn, ColumnSpec] = {
     ),
     TrackTableColumn.TITLE: ColumnSpec(
         label="Title",
-        resize_mode=QHeaderView.ResizeMode.ResizeToContents,
+        resize_mode=QHeaderView.ResizeMode.Interactive,
         padding=4,
         get_value=lambda t, i: t.title,
     ),
     TrackTableColumn.ARTIST: ColumnSpec(
         label="Artist",
-        resize_mode=QHeaderView.ResizeMode.ResizeToContents,
+        resize_mode=QHeaderView.ResizeMode.Interactive,
         padding=4,
         get_value=lambda t, i: t.artist,
     ),
     TrackTableColumn.DURATION: ColumnSpec(
         label="Duration",
-        resize_mode=QHeaderView.ResizeMode.ResizeToContents,
+        resize_mode=QHeaderView.ResizeMode.Interactive,
         padding=4,
         get_value=lambda t, i: t.duration_formatted,
         alignment=Qt.AlignmentFlag.AlignCenter,
     ),
     TrackTableColumn.COMMENTS: ColumnSpec(
         label="Comments",
-        resize_mode=QHeaderView.ResizeMode.Stretch,
+        resize_mode=QHeaderView.ResizeMode.Interactive,
         padding=4,
         get_value=lambda t, i: t.comments or "",
-        skip_width_calc=True,
     ),
     TrackTableColumn.LOCATION: ColumnSpec(
         label="Location",
-        resize_mode=QHeaderView.ResizeMode.Fixed,
+        resize_mode=QHeaderView.ResizeMode.Interactive,
         padding=30,
         get_value=lambda t, i: t.location,
     ),
@@ -100,7 +98,7 @@ COLUMN_SPECS: dict[TrackTableColumn, ColumnSpec] = {
     ),
     TrackTableColumn.BPM: ColumnSpec(
         label="~BPM",
-        resize_mode=QHeaderView.ResizeMode.ResizeToContents,
+        resize_mode=QHeaderView.ResizeMode.Interactive,
         padding=8,
         get_value=lambda t, i: str(round(t.bpm)) if t.bpm is not None else "",
         alignment=Qt.AlignmentFlag.AlignCenter,
@@ -144,7 +142,7 @@ class TrackTableManager(QObject):
         header = self._table.horizontalHeader()
         assert header is not None
         self._header: QHeaderView = header
-        self._header.setStretchLastSection(False)
+        self._header.setStretchLastSection(True)
         self._header.setSortIndicatorShown(True)
         self._header.setSectionsMovable(True)
         for col, spec in COLUMN_SPECS.items():
@@ -239,9 +237,6 @@ class TrackTableManager(QObject):
         content_fm = self._header.fontMetrics()
 
         for col, spec in COLUMN_SPECS.items():
-            if spec.skip_width_calc:
-                continue
-
             header_text_width = header_fm.boundingRect(spec.label).width()
             min_width = header_text_width + _HEADER_MIN_PADDING
 
@@ -256,19 +251,36 @@ class TrackTableManager(QObject):
 
     def _on_header_context_menu(self, pos: QPoint) -> None:
         logical_col = self._header.logicalIndexAt(pos)
-        if logical_col != TrackTableColumn.DATE_ADDED:
-            return
         menu = QMenu()
-        for preset in DatePreset:
-            action = menu.addAction(preset.value)
+
+        # Column visibility toggles
+        for col in TrackTableColumn:
+            spec = COLUMN_SPECS[col]
+            action = menu.addAction(spec.label)
             action.setCheckable(True)
-            action.setChecked(self._active_date_preset == preset)
-            action.triggered.connect(lambda checked, p=preset: self._set_date_preset(p))
-        menu.addSeparator()
-        clear_action = menu.addAction("Clear date filter")
-        clear_action.setEnabled(self._active_date_preset is not None)
-        clear_action.triggered.connect(lambda: self._set_date_preset(None))
+            action.setChecked(not self._header.isSectionHidden(col))
+            action.triggered.connect(lambda checked, c=col: self._toggle_column(c, checked))
+
+        # Date filter options when right-clicking the Date Added column
+        if logical_col == TrackTableColumn.DATE_ADDED:
+            menu.addSeparator()
+            for preset in DatePreset:
+                action = menu.addAction(preset.value)
+                action.setCheckable(True)
+                action.setChecked(self._active_date_preset == preset)
+                action.triggered.connect(lambda checked, p=preset: self._set_date_preset(p))
+            menu.addSeparator()
+            clear_action = menu.addAction("Clear date filter")
+            clear_action.setEnabled(self._active_date_preset is not None)
+            clear_action.triggered.connect(lambda: self._set_date_preset(None))
+
         menu.exec(self._header.mapToGlobal(pos))
+
+    def _toggle_column(self, col: int, show: bool) -> None:
+        if show:
+            self._header.showSection(col)
+        else:
+            self._header.hideSection(col)
 
     def _set_date_preset(self, preset: DatePreset | None) -> None:
         self._active_date_preset = preset

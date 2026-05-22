@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 
 from ..models.track import Track
 from .styles import THEME
-from .widgets import CategoryPill, SuggestionButton
+from .widgets import CategoryPill, ClickableLabel, SeekSlider, SuggestionButton
 
 
 def create_track_table() -> tuple[QWidget, QLineEdit, QTableWidget, "TrackTableManager"]:
@@ -187,12 +187,10 @@ def create_details_panel() -> tuple[
     )
 
 
-def create_playback_bar() -> tuple[QWidget, QLabel, QPushButton, QSlider, QLabel, QSlider]:
+def create_playback_bar() -> tuple[QWidget, QLabel, QPushButton, QSlider, QLabel, QLabel, QSlider]:
     bar = QFrame()
     bar.setFixedHeight(50)
-    bar.setStyleSheet(
-        f"background-color: {THEME['secondary_bg']}; border-top: 1px solid {THEME['border']};"
-    )
+    bar.setStyleSheet(f"background-color: {THEME['secondary_bg']};")
 
     layout = QHBoxLayout(bar)
     layout.setContentsMargins(12, 8, 12, 8)
@@ -200,7 +198,7 @@ def create_playback_bar() -> tuple[QWidget, QLabel, QPushButton, QSlider, QLabel
 
     now_playing_label = QLabel("No track playing")
     now_playing_label.setStyleSheet(f"color: {THEME['text_secondary']};")
-    now_playing_label.setFixedWidth(200)
+    now_playing_label.setFixedWidth(280)
     layout.addWidget(now_playing_label)
 
     play_btn = QPushButton()
@@ -208,8 +206,7 @@ def create_playback_bar() -> tuple[QWidget, QLabel, QPushButton, QSlider, QLabel
     play_btn.setStyleSheet(
         "QPushButton {"
         "  background-color: #1A1A1A;"
-        "  border: 2px solid #444444;"
-        ""
+        "  border: none;"
         "}"
         "QPushButton:hover {"
         "  background-color: #333333;"
@@ -220,20 +217,19 @@ def create_playback_bar() -> tuple[QWidget, QLabel, QPushButton, QSlider, QLabel
 
     layout.addWidget(play_btn)
 
-    position_slider = QSlider(Qt.Orientation.Horizontal)
+    position_slider = SeekSlider(Qt.Orientation.Horizontal)
     position_slider.setRange(0, 1000)
     position_slider.setValue(0)
     position_slider.setTracking(True)
-    layout.addWidget(position_slider)
+    layout.addWidget(position_slider, 1)
 
     time_label = QLabel("00:00 / 00:00")
     time_label.setFixedWidth(100)
     layout.addWidget(time_label)
 
-    layout.addStretch()
-
-    volume_icon = QLabel("🔊")
-    layout.addWidget(volume_icon)
+    mute_btn = ClickableLabel("🔊")
+    mute_btn.setStyleSheet(f"color: {THEME['text_secondary']}; font-size: 16px;")
+    layout.addWidget(mute_btn)
 
     volume_slider = QSlider(Qt.Orientation.Horizontal)
     volume_slider.setRange(0, 100)
@@ -241,7 +237,7 @@ def create_playback_bar() -> tuple[QWidget, QLabel, QPushButton, QSlider, QLabel
     volume_slider.setFixedWidth(80)
     layout.addWidget(volume_slider)
 
-    return bar, now_playing_label, play_btn, position_slider, time_label, volume_slider
+    return bar, now_playing_label, play_btn, position_slider, time_label, mute_btn, volume_slider
 
 
 def update_play_icon(play_btn: QPushButton, is_playing: bool) -> None:

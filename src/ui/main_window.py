@@ -46,6 +46,7 @@ from .panels import (
 )
 from .scanner_worker import ScannerWorker
 from .styles import STYLESHEET
+from .trash_tab import TrashTab
 from .widgets import Toast
 from .workers.bpm_worker import BpmWorker
 
@@ -87,7 +88,7 @@ class MainWindow(QMainWindow):
         self._connect_controllers()
         self._connect_shortcuts()
         self._load_library()
-        self.statusBar().showMessage("Ready")
+        self.statusBar().hide()
 
     def _setup_ui(self):
         self.setWindowTitle("MonoVault")
@@ -137,16 +138,20 @@ class MainWindow(QMainWindow):
 
         self.duplicates_tab = DuplicatesTab(self.library, self._confirm_and_delete_tracks)
         self.duplicates_tab.track_selected.connect(self.category_ctrl.select_track)
+        self.duplicates_tab.play_track_requested.connect(self.playback_ctrl.play_track)
 
         self.category_stats_tab = CategoryStatsTab(self.library)
         self.category_stats_tab.category_filter_requested.connect(
             self._on_category_filter_requested
         )
 
+        self.trash_tab = TrashTab(self.delete_ctrl)
+
         self._tabs = QTabWidget()
         self._tabs.addTab(self._splitter, "Library")
         self._tabs.addTab(self.duplicates_tab, "Duplicates")
         self._tabs.addTab(self.category_stats_tab, "Categories")
+        self._tabs.addTab(self.trash_tab, "Trash")
         self._tabs.currentChanged.connect(self._on_tab_changed)
 
         outer_splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -166,6 +171,7 @@ class MainWindow(QMainWindow):
             self.play_btn,
             self.position_slider,
             self.time_label,
+            self.mute_btn,
             self.volume_slider,
         ) = create_playback_bar()
 
@@ -210,6 +216,8 @@ class MainWindow(QMainWindow):
         self.play_btn.clicked.connect(self.playback_ctrl.toggle_playback)
         self.position_slider.sliderMoved.connect(self.playback_ctrl.seek)
         self.volume_slider.sliderMoved.connect(self.playback_ctrl.set_volume)
+        self.mute_btn.clicked.connect(self.playback_ctrl.toggle_mute)
+        self.playback_ctrl.mute_changed.connect(self._on_mute_changed)
 
         self.search_ctrl.results_changed.connect(self._on_search_results)
         self.track_table_manager.date_filter_changed.connect(self.search_ctrl.set_date_filter)
@@ -232,7 +240,7 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence("Ctrl+F"), self).activated.connect(self.search_input.setFocus)
         QShortcut(QKeySequence("Ctrl+R"), self).activated.connect(self._refresh_library)
         QShortcut(QKeySequence("Ctrl+O"), self).activated.connect(self._add_folder)
-        QShortcut(QKeySequence("Ctrl+Shift+T"), self).activated.connect(self._open_trash_dialog)
+        QShortcut(QKeySequence("Ctrl+Shift+T"), self).activated.connect(self._go_to_trash_tab)
 
     def _on_write_failed(self, file_path: str, msg: str) -> None:
         self.toast.show_message(
@@ -594,9 +602,10 @@ class MainWindow(QMainWindow):
                 # No subfolders — include all tracks in this root folder
                 checked_dirs.add(root_path)
             else:
-                # Has subfolders — root-level files always follow parent state,
+                # Has subfolders — root-level files only shown when parent is fully checked;
                 # individual subfolders follow their own check state
-                checked_dirs.add(root_path)
+                if top.checkState(0) == Qt.CheckState.Checked:
+                    checked_dirs.add(root_path)
                 for j in range(top.childCount()):
                     child = top.child(j)
                     if child and child.checkState(0) == Qt.CheckState.Checked:
@@ -719,11 +728,10 @@ class MainWindow(QMainWindow):
     def _on_restore_failed(self, message: str) -> None:
         self.toast.show_message(f"Restore failed: {message}")
 
-    def _open_trash_dialog(self) -> None:
-        from .trash_dialog import TrashDialog
-
-        dialog = TrashDialog(self.delete_ctrl, parent=self)
-        dialog.exec()
+    def _go_to_trash_tab(self) -> None:
+        trash_index = self._tabs.indexOf(self.trash_tab)
+        self._tabs.setCurrentIndex(trash_index)
+        self.trash_tab.refresh()
 
     def _on_track_double_clicked(self, item, column=None):
         row = item.row()
@@ -745,6 +753,9 @@ class MainWindow(QMainWindow):
 
     def _update_play_icon(self, is_playing: bool):
         update_play_icon(self.play_btn, is_playing)
+
+    def _on_mute_changed(self, muted: bool) -> None:
+        self.mute_btn.setText("🔇" if muted else "🔊")
 
     def _on_add_category_input(self):
         raw = self.category_input.text().strip()
@@ -796,6 +807,8 @@ class MainWindow(QMainWindow):
         widget = self._tabs.widget(index)
         if widget is self.category_stats_tab:
             self.category_stats_tab.show_if_dirty()
+        elif widget is self.trash_tab:
+            self.trash_tab.refresh()
 
     def _on_category_filter_requested(self, category: str) -> None:
         query = 'category:""' if category == UNTAGGED_SENTINEL else f'category:"{category}"'

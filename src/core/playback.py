@@ -53,6 +53,12 @@ class PlaybackEngine(QObject):
     def get_volume(self) -> int:
         return int(self.audio.volume() * 100)
 
+    def set_muted(self, muted: bool) -> None:
+        self.audio.setMuted(muted)
+
+    def is_muted(self) -> bool:
+        return self.audio.isMuted()
+
     def get_position(self) -> int:
         return self.player.position()
 

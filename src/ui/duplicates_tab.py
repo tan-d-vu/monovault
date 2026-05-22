@@ -51,6 +51,7 @@ class _NumericItem(QTableWidgetItem):
 
 class DuplicatesTab(QWidget):
     track_selected = pyqtSignal(Track)
+    play_track_requested = pyqtSignal(Track)
 
     def __init__(
         self,
@@ -94,6 +95,7 @@ class DuplicatesTab(QWidget):
         self._table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self._table.customContextMenuRequested.connect(self._on_context_menu)
         self._table.itemSelectionChanged.connect(self._on_selection_changed)
+        self._table.itemDoubleClicked.connect(self._on_double_clicked)
         self._table.installEventFilter(self)
         layout.addWidget(self._table, 1)
 
@@ -241,15 +243,30 @@ class DuplicatesTab(QWidget):
         if not tracks:
             return
         menu = QMenu(self)
+        play_action = menu.addAction("Play")
+        play_action.setEnabled(len(tracks) == 1)
+        menu.addSeparator()
         delete_action = menu.addAction("Move to Trash")
         viewport = self._table.viewport()
         anchor = viewport if viewport is not None else self._table
         action = menu.exec(anchor.mapToGlobal(pos))
-        if action == delete_action:
+        if action == play_action and tracks:
+            self.play_track_requested.emit(tracks[0])
+        elif action == delete_action:
             self._confirm_delete(tracks)
+
+    def _on_double_clicked(self, item) -> None:
+        track = item.data(Qt.ItemDataRole.UserRole)
+        if track is not None:
+            self.play_track_requested.emit(track)
 
     def eventFilter(self, obj, event):
         if obj is self._table and event.type() == QEvent.Type.KeyPress:
+            if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+                tracks = self._selected_tracks()
+                if tracks:
+                    self.play_track_requested.emit(tracks[0])
+                return True
             if event.key() == Qt.Key.Key_Delete:
                 tracks = self._selected_tracks()
                 if tracks:

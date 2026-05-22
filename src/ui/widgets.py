@@ -1,7 +1,51 @@
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
-from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QSizePolicy, QWidget
+from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QSizePolicy, QSlider, QWidget
 
 from .styles import THEME
+
+
+class SeekSlider(QSlider):
+    """Horizontal seek slider that jumps directly to the clicked position.
+
+    The default QSlider steps by pageStep on click (rather than jumping).
+    This subclass overrides mouse handling so both clicks and drags move
+    the handle — and emit sliderMoved — to the exact cursor position.
+    """
+
+    def mousePressEvent(self, event) -> None:
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.setValue(self._value_at(event.position().x()))
+            self.sliderMoved.emit(self.value())
+            event.accept()
+        else:
+            super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event) -> None:
+        if event.buttons() & Qt.MouseButton.LeftButton:
+            self.setValue(self._value_at(event.position().x()))
+            self.sliderMoved.emit(self.value())
+            event.accept()
+        else:
+            super().mouseMoveEvent(event)
+
+    def _value_at(self, x: float) -> int:
+        ratio = max(0.0, min(1.0, x / max(self.width(), 1)))
+        return int(self.minimum() + ratio * (self.maximum() - self.minimum()))
+
+
+class ClickableLabel(QLabel):
+    """QLabel that emits clicked() on left mouse press."""
+
+    clicked = pyqtSignal()
+
+    def __init__(self, text: str, parent=None):
+        super().__init__(text, parent)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+
+    def mousePressEvent(self, event) -> None:
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.clicked.emit()
+        super().mousePressEvent(event)
 
 
 class CategoryPill(QWidget):
